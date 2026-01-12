@@ -1,27 +1,76 @@
-# COGNIT — Classroom Quiz Application
+# COGNIT — Educational Assessment Platform
 
 ## Complete Project Planning Document
 
-**Version:** 1.0  
-**Date:** January 11, 2026  
+**Version:** 2.0  
+**Date:** January 12, 2026  
 **Platform:** Windows
 
 ---
 
 # 1. PROJECT OVERVIEW
 
-## 1.1 Purpose
+## 1.1 Platform Concept
 
-Cognit is a classroom quiz application that enables instructors to host live, game-show-style quizzes on a local intranet. Students join from their own laptops via web browser and compete in real-time.
+**Cognit** is a modular educational assessment platform that manages question pools, builds quizzes/tests, tracks results, and hosts interactive games. It's designed to be extensible — new game modes and assessment types can be added over time while sharing the same question pool and results infrastructure.
 
-## 1.2 Key Features
+## 1.2 Modular Architecture
 
-- **Question Pool Management** — Create, edit, and organize multiple choice questions with optional images
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              COGNIT CORE                                     │
+│                                                                             │
+│   ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐             │
+│   │  Question Pool  │  │  Quiz Builder   │  │ Results Tracker │             │
+│   │  Management     │  │                 │  │                 │             │
+│   │                 │  │  - Build quizzes│  │  - Session logs │             │
+│   │  - Topics       │  │  - Select Q's   │  │  - Player scores│             │
+│   │  - Questions    │  │  - Order Q's    │  │  - Analytics    │             │
+│   │  - CRUD ops     │  │  - Edit later   │  │  - Export data  │             │
+│   └─────────────────┘  └─────────────────┘  └─────────────────┘             │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                              GAME MODULES                                    │
+│                                                                             │
+│   ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐             │
+│   │   PointDrop     │  │   (Future)      │  │   (Future)      │             │
+│   │   Quiz Game     │  │   Standard Test │  │   Other Games   │             │
+│   │                 │  │                 │  │                 │             │
+│   │  - Elimination  │  │  - Timed tests  │  │  - Team modes   │             │
+│   │  - Live scoring │  │  - No scoring   │  │  - Tournaments  │             │
+│   │  - Leaderboard  │  │  - Review mode  │  │  - etc.         │             │
+│   └─────────────────┘  └─────────────────┘  └─────────────────┘             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+## 1.3 Components
+
+### Cognit Core
+- **Question Pool** — Master repository of questions organized by topics
+- **Quiz Builder** — Create assessments by selecting questions from the pool
+- **Results Tracker** — Store and analyze outcomes from all game sessions
+
+### PointDrop (Game Module)
+- **Live quiz game** with elimination mechanics and continuous scoring
+- Students compete in real-time on a local intranet
+- Game-show style with declining points and answer elimination
+
+## 1.4 Key Features
+
+**Cognit Core:**
+- **Question Pool Management** — Create, edit, and organize questions with optional images
+- **Topic Organization** — Categorize questions for easy filtering
+- **Quiz Builder** — Assemble quizzes from the question pool
+- **Results Tracking** — Store all session results for review and analysis
+- **Extensible** — Add new game modules without modifying the core
+
+**PointDrop Game:**
 - **Student Participation** — Students join with just their name (no accounts required)
 - **Live Game Show Mode** — One question at a time, all students answer simultaneously
-- **Progressive Elimination** — Wrong answers are disabled over time to help struggling students
+- **Progressive Elimination** — Wrong answers are disabled over time
 - **Continuous Scoring** — Points decrease by the millisecond to minimize ties
-- **Dual Display** — Instructor control panel + separate projector window for class viewing
+- **Dual Display** — Instructor control panel + separate projector window
 - **Automatic Grading** — Instant scoring and leaderboard updates
 
 ---
@@ -322,10 +371,11 @@ Correct answer stored as: 'A', 'B', 'C', or 'D'
 |--------|------|-------------|-------------|
 | id | INTEGER | PRIMARY KEY | Auto-increment ID |
 | quiz_id | INTEGER | FOREIGN KEY | Reference to Quiz being played |
+| game_type | TEXT | NOT NULL | Game module used: 'pointdrop', 'standard_test', etc. |
 | status | TEXT | NOT NULL | waiting / active / finished |
 | current_q_index | INTEGER | NOT NULL | Current question position |
-| started_at | DATETIME | NULLABLE | When quiz started |
-| ended_at | DATETIME | NULLABLE | When quiz ended |
+| started_at | DATETIME | NULLABLE | When session started |
+| ended_at | DATETIME | NULLABLE | When session ended |
 
 ### Player
 | Column | Type | Constraints | Description |
@@ -921,41 +971,60 @@ Cognit/
 │   ├── main.py                    # FastAPI app entry point
 │   ├── config.py                  # Settings (port, DB path, etc.)
 │   ├── database.py                # Async SQLAlchemy setup
-│   ├── models.py                  # ORM models
+│   ├── models.py                  # ORM models (Cognit Core)
 │   ├── schemas.py                 # Pydantic request/response models
 │   │
 │   ├── routers/
 │   │   ├── __init__.py
+│   │   ├── topics.py              # CRUD for topics
 │   │   ├── questions.py           # CRUD for questions
 │   │   ├── quizzes.py             # CRUD for quizzes
-│   │   └── sessions.py            # Game session management
+│   │   ├── sessions.py            # Session management
+│   │   └── results.py             # Results tracking & analytics
 │   │
 │   ├── websocket/
 │   │   ├── __init__.py
 │   │   ├── manager.py             # WebSocket connection manager
-│   │   └── handlers.py            # Message handlers
+│   │   └── base_handler.py        # Base game handler interface
 │   │
-│   └── game/
+│   └── games/                     # GAME MODULES (extensible)
 │       ├── __init__.py
-│       ├── engine.py              # Quiz game state machine
-│       └── scoring.py             # Scoring calculations
+│       ├── base.py                # Abstract base game class
+│       │
+│       └── pointdrop/             # PointDrop game module
+│           ├── __init__.py
+│           ├── engine.py          # PointDrop game state machine
+│           ├── scoring.py         # Continuous decay scoring
+│           ├── elimination.py     # Answer elimination logic
+│           └── handlers.py        # PointDrop WebSocket handlers
 │
 ├── instructor/
 │   ├── __init__.py
 │   ├── main.py                    # PyQt6 app entry point
-│   ├── admin_window.py            # Question/quiz management
-│   ├── control_panel.py           # Live quiz control
-│   ├── display_window.py          # Fullscreen projector view
-│   └── api_client.py              # HTTP client to server
+│   ├── api_client.py              # HTTP client to server
+│   │
+│   ├── core/                      # Cognit Core UI
+│   │   ├── __init__.py
+│   │   ├── topic_manager.py       # Topic CRUD
+│   │   ├── question_pool.py       # Question pool management
+│   │   ├── quiz_builder.py        # Quiz assembly
+│   │   └── results_viewer.py      # Session results & analytics
+│   │
+│   └── games/                     # Game-specific UI
+│       └── pointdrop/
+│           ├── __init__.py
+│           ├── control_panel.py   # Live PointDrop control
+│           └── display_window.py  # Fullscreen projector view
 │
 ├── static/                        # Student web UI
-│   ├── index.html                 # Join page
-│   ├── game.html                  # Quiz game page
-│   ├── css/
-│   │   └── styles.css             # Compiled TailwindCSS
-│   └── js/
-│       ├── join.js                # Join page logic
-│       └── game.js                # WebSocket + game UI
+│   ├── index.html                 # Game selection / join page
+│   │
+│   └── pointdrop/                 # PointDrop student UI
+│       ├── game.html              # PointDrop game page
+│       ├── css/
+│       │   └── styles.css         # PointDrop styles
+│       └── js/
+│           └── game.js            # WebSocket + game UI
 │
 ├── media/                         # Uploaded files
 │   └── questions/                 # Question images
@@ -1005,34 +1074,50 @@ Cognit/
 
 # 12. BUILD ORDER
 
-| Phase | Task | Description |
-|-------|------|-------------|
-| 1 | Project Setup | Create folder structure, requirements.txt |
-| 2 | Database | SQLAlchemy models, database initialization |
-| 3 | REST API | FastAPI endpoints for questions/quizzes |
-| 4 | WebSocket | Connection manager, game event handlers |
-| 5 | Game Engine | Scoring, elimination, state management |
-| 6 | Student UI | HTML/CSS/JS join and game pages |
-| 7 | Instructor Admin | PyQt6 question/quiz management |
-| 8 | Instructor Display | PyQt6 fullscreen projector window |
-| 9 | Integration | Connect all components, test flow |
-| 10 | Polish | Error handling, edge cases, UX improvements |
+| Phase | Component | Task | Description |
+|-------|-----------|------|-------------|
+| 1 | Setup | Project Setup | Create folder structure, requirements.txt |
+| 2 | Core | Database Models | SQLAlchemy models for Cognit Core |
+| 3 | Core | REST API | Topics, Questions, Quizzes, Results endpoints |
+| 4 | Core | Instructor UI | PyQt6 topic/question/quiz management |
+| 5 | Core | Results Tracker | Session logging and analytics |
+| 6 | PointDrop | Game Engine | Scoring, elimination, state machine |
+| 7 | PointDrop | WebSocket | Connection manager, PointDrop handlers |
+| 8 | PointDrop | Student UI | HTML/CSS/JS join and game pages |
+| 9 | PointDrop | Instructor UI | Control panel + display window |
+| 10 | All | Integration | Connect all components, test flow |
+| 11 | All | Polish | Error handling, edge cases, UX improvements |
 
 ---
 
 # 13. SUMMARY
 
-**Cognit** is a classroom quiz application featuring:
+**Cognit** is a modular educational assessment platform featuring:
 
+**Cognit Core:**
+- **Question Pool Management** — Organized by topics with full CRUD
+- **Quiz Builder** — Assemble assessments from the question pool
+- **Results Tracking** — Store and analyze all session outcomes
+- **Extensible Architecture** — Add new game modules without modifying the core
+
+**PointDrop Game Module:**
+- **Game show mechanics** — Progressive elimination + continuous scoring
+- **Real-time competition** — All students answer simultaneously
+- **Dual display** — Control panel + fullscreen projector window
+- **Per-question time limits** — 5-30 seconds configurable
+
+**Technology:**
 - **FastAPI backend** with native WebSocket support
 - **SQLite database** for portable, file-based storage
-- **PyQt6 instructor application** with dual-window support
+- **PyQt6 instructor application** with modular UI
 - **Browser-based student interface** accessible on any laptop
-- **Game show mechanics** with progressive elimination and continuous scoring
-- **Image support** for visual questions
-- **Per-question time limits** (5-15 seconds)
-- **Real-time synchronization** for an engaging classroom experience
+
+**Future Expansion:**
+- Standard timed tests (no game mechanics)
+- Team competition modes
+- Tournament brackets
+- Additional game types
 
 ---
 
-*Document generated: January 11, 2026*
+*Document generated: January 12, 2026*
