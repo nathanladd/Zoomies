@@ -229,6 +229,65 @@ Pillow>=10.2
 
 **Key Principle:** Questions exist independently in the pool. Quizzes are just ordered selections of questions. The same question can appear in multiple quizzes.
 
+## 5.5 Quiz Lifecycle & Results Tracking
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           QUIZ LIFECYCLE                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   QUIZ DEFINITION (saved, reusable)                                         │
+│   ┌─────────────────────────────┐                                           │
+│   │  Quiz: "Chapter 5 Review"   │                                           │
+│   │  - 10 questions selected    │                                           │
+│   │  - Saved in database        │                                           │
+│   └─────────────────────────────┘                                           │
+│                │                                                            │
+│                │  Can be administered multiple times                        │
+│                ▼                                                            │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                        GAME SESSIONS                                │   │
+│   │                                                                     │   │
+│   │  Session #1              Session #2              Session #3         │   │
+│   │  Jan 12, Period 1        Jan 12, Period 3        Jan 15, Period 1   │   │
+│   │  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐│   │
+│   │  │ Alice: 8500 pts │     │ Dan: 9200 pts   │     │ Alice: 9100 pts ││   │
+│   │  │ Bob: 7200 pts   │     │ Eve: 8800 pts   │     │ Grace: 8900 pts ││   │
+│   │  │ Carol: 6900 pts │     │ Frank: 7500 pts │     │ Henry: 8200 pts ││   │
+│   │  └─────────────────┘     └─────────────────┘     └─────────────────┘│   │
+│   │                                                                     │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                │                                                            │
+│                ▼                                                            │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                     RESULTS TRACKING                                │   │
+│   │                                                                     │   │
+│   │  Per Session:                    Per Student (by name):             │   │
+│   │  - Date/time administered        - All sessions participated in    │   │
+│   │  - All participants & scores     - Scores across sessions          │   │
+│   │  - Per-question breakdown        - Per-question performance        │   │
+│   │  - Game type used                - Progress over time              │   │
+│   │                                                                     │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Concepts:**
+
+| Concept | Description |
+|---------|-------------|
+| **Quiz** | A saved template — select questions once, administer many times |
+| **GameSession** | One instance of administering a quiz (e.g., "Period 1 on Jan 12") |
+| **Player** | A student's participation in one session (identified by name) |
+| **Answer** | Each student's response to each question in a session |
+
+**Results Queries:**
+- "Show me all sessions of Quiz X" → List of GameSessions
+- "Show me Alice's history" → Filter Players by name, join to sessions
+- "How did Period 1 do vs Period 3?" → Compare sessions
+- "Which questions are students missing most?" → Aggregate Answers by question
+
 ---
 
 # 6. DATABASE SCHEMA
