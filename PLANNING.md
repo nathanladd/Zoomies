@@ -223,6 +223,7 @@ Pillow>=10.2
 | **Create** | New quiz with name and description |
 | **Add Questions** | Select questions from pool (any topic) |
 | **Reorder** | Drag-and-drop to change question order |
+| **Randomize Order** | Shuffle all questions into random order during quiz setup |
 | **Remove Questions** | Remove questions from quiz (stays in pool) |
 | **Edit** | Change quiz name, description, or questions at any time |
 | **Delete** | Remove quiz (questions remain in pool) |
@@ -415,6 +416,7 @@ Correct answer stored as: 'A', 'B', 'C', or 'D'
 | id | INTEGER | PRIMARY KEY | Auto-increment ID |
 | name | TEXT | NOT NULL | Quiz title |
 | description | TEXT | NULLABLE | Optional description |
+| randomize_order | BOOLEAN | NOT NULL, DEFAULT FALSE | Whether to shuffle question order each session |
 | created_at | DATETIME | NOT NULL | Creation timestamp |
 
 ### QuizQuestion
@@ -497,6 +499,64 @@ Correct answer stored as: 'A', 'B', 'C', or 'D'
 4. **Eliminations** → server picks random wrong answers to disable (not always A first)
 5. **Student answers** → server compares selected text to `correct_answer` field
 6. **Next question** → shuffle again with new random positions
+
+---
+
+## 6.4 Question Order Randomization
+
+### Overview
+
+When `quiz.randomize_order = TRUE`, the server shuffles the question order at the start of each game session. This ensures students experience a different question sequence each time the quiz is administered, while maintaining consistent answer randomization for each question.
+
+### Randomization Flow
+
+```
+DATABASE (Quiz Definition)                     GAME SESSION (Runtime)
+                                                
+Quiz: "Chapter 5 Review"                        Session #1 (Jan 12):
+- randomize_order: TRUE                         - Q3, Q1, Q4, Q2, Q5
+- Questions in position order:                  Session #2 (Jan 15):
+  1. Q1: "What is 2+2?"                          - Q5, Q2, Q1, Q3, Q4
+  2. Q2: "What is 5x3?"                          Session #3 (Jan 20):
+  3. Q3: "What is 10/2?"                         - Q2, Q4, Q1, Q5, Q3
+  4. Q4: "What is 7-3?"
+  5. Q5: "What is 8+1?"
+```
+
+### Implementation Logic
+
+1. **Quiz Creation**: Instructor sets `randomize_order = TRUE` in Quiz Builder
+2. **Session Start**: Server queries QuizQuestions ordered by `position`
+3. **Shuffle**: Python's `random.shuffle()` creates new question order
+4. **Session Storage**: Randomized order stored in memory for the session
+5. **Question Progression**: `GameSession.current_q_index` advances through shuffled list
+6. **Answer Tracking**: Each answer records the original `question_id` for analytics
+
+### Key Benefits
+
+- **Fair Assessment**: Different question orders reduce cheating potential
+- **Fresh Experience**: Students can't memorize question sequences
+- **Consistent Analytics**: Results tracked by original question IDs
+- **Flexible Design**: Instructors can toggle randomization per quiz
+
+### Technical Implementation
+
+```python
+# When starting a new game session
+async def start_session(quiz_id: int):
+    quiz = await get_quiz(quiz_id)
+    questions = await get_quiz_questions(quiz_id)  # Ordered by position
+    
+    if quiz.randomize_order:
+        random.shuffle(questions)  # In-place shuffle
+    
+    session = await create_game_session(
+        quiz_id=quiz_id,
+        question_order=[q.id for q in questions]  # Store shuffled order
+    )
+    
+    return session
+```
 
 ---
 
