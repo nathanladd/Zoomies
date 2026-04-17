@@ -1,0 +1,24 @@
+# FastAPI + Server
+fastapi>=0.109
+uvicorn[standard]>=0.27
+websockets>=12.0
+
+# Database
+sqlalchemy[asyncio]>=2.0
+aiosqlite>=0.19
+
+# Validation
+pydantic>=2.5
+
+# Desktop GUI
+PyQt6>=6.6
+
+# HTTP Client (for instructor app)
+httpx>=0.26
+
+# File Handling
+python-multipart>=0.0.6
+aiofiles>=23.2
+
+# Image Processing (optional)
+Pillow>=10.2

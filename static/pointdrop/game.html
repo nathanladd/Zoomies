@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognit - PointDrop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/pointdrop/css/styles.css">
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+
+    <!-- WAITING SCREEN -->
+    <div id="screen-waiting" class="screen active flex items-center justify-center min-h-screen">
+        <div class="text-center space-y-6 p-8">
+            <h1 class="text-5xl font-bold glow text-indigo-400">COGNIT</h1>
+            <div class="bg-slate-800/80 backdrop-blur rounded-2xl p-8 max-w-md mx-auto space-y-4 border border-slate-700">
+                <p class="text-2xl font-semibold">Welcome, <span id="player-name-display" class="text-indigo-300"></span>!</p>
+                <div class="animate-pulse text-slate-300">
+                    <p class="text-lg">Waiting for quiz to start...</p>
+                </div>
+                <p id="player-count" class="text-slate-400">0 players joined</p>
+                <div id="player-list" class="text-sm text-slate-500 mt-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QUESTION SCREEN -->
+    <div id="screen-question" class="screen hidden">
+        <div class="max-w-4xl mx-auto p-4 space-y-4">
+            <!-- Header -->
+            <div class="flex justify-between items-center">
+                <span id="q-progress" class="text-slate-400 text-lg font-medium"></span>
+                <div class="flex items-center gap-4">
+                    <span id="q-timer" class="text-2xl font-bold text-amber-400"></span>
+                    <span id="q-points" class="text-2xl font-bold text-emerald-400"></span>
+                </div>
+            </div>
+
+            <!-- Timer Bar -->
+            <div class="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
+                <div id="timer-bar" class="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full transition-all duration-100"></div>
+            </div>
+
+            <!-- Question Image -->
+            <div id="q-image-container" class="hidden flex justify-center">
+                <img id="q-image" class="max-h-64 rounded-xl border border-slate-600" alt="Question image">
+            </div>
+
+            <!-- Question Text -->
+            <div id="q-text" class="text-xl md:text-2xl text-center font-medium py-4 px-2"></div>
+
+            <!-- Answer Choices -->
+            <div id="choices-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Populated by JS -->
+            </div>
+
+            <!-- Locked-in message -->
+            <div id="locked-msg" class="hidden text-center py-4">
+                <p class="text-lg text-slate-300 animate-pulse">Answer locked in. Waiting for time to expire...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- RESULT SCREEN (per question) -->
+    <div id="screen-result" class="screen hidden">
+        <div class="max-w-2xl mx-auto p-8 text-center space-y-6">
+            <p id="q-progress-result" class="text-slate-400 text-lg"></p>
+
+            <div id="result-banner" class="text-4xl font-bold py-4"></div>
+            <p id="result-points" class="text-2xl"></p>
+
+            <!-- Show all choices with correct highlighted -->
+            <div id="result-choices" class="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-lg mx-auto"></div>
+
+            <div class="bg-slate-800 rounded-xl p-4 flex justify-between items-center max-w-lg mx-auto">
+                <div>
+                    <p class="text-sm text-slate-400">Your Score</p>
+                    <p id="result-total-score" class="text-2xl font-bold text-indigo-300"></p>
+                </div>
+                <div>
+                    <p class="text-sm text-slate-400">Rank</p>
+                    <p id="result-rank" class="text-2xl font-bold text-amber-400"></p>
+                </div>
+            </div>
+
+            <p class="text-slate-400 animate-pulse">Waiting for instructor to continue...</p>
+        </div>
+    </div>
+
+    <!-- FINAL RESULTS SCREEN -->
+    <div id="screen-final" class="screen hidden">
+        <div class="max-w-2xl mx-auto p-8 text-center space-y-6">
+            <h2 class="text-4xl font-bold text-amber-400">QUIZ COMPLETE!</h2>
+
+            <div>
+                <p class="text-slate-400">Your Final Score</p>
+                <p id="final-score" class="text-5xl font-bold text-indigo-300"></p>
+            </div>
+
+            <p id="final-rank" class="text-3xl font-bold"></p>
+
+            <div class="bg-slate-800 rounded-xl p-4 text-left max-w-lg mx-auto">
+                <h3 class="text-lg font-semibold text-slate-300 mb-3">Leaderboard</h3>
+                <div id="final-leaderboard" class="space-y-2"></div>
+            </div>
+
+            <button onclick="window.location.href='/'"
+                class="mt-4 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-lg font-semibold transition-all">
+                Back to Home
+            </button>
+        </div>
+    </div>
+
+    <script src="/static/pointdrop/js/game.js"></script>
+</body>
+</html>
