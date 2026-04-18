@@ -1,4 +1,4 @@
-"""End-to-end integration test for Cognit API. Run with: python test_integration.py"""
+"""End-to-end integration test for Zündpunkt API. Run with: python test_integration.py"""
 import httpx
 import sys
 
@@ -96,7 +96,7 @@ def main():
 
     # ── Sessions ───────────────────────────────────────────────────────────
     print("\n=== Sessions ===")
-    sess = c.post("/api/sessions", json={"quiz_id": qz["id"], "game_type": "pointdrop"}).json()
+    sess = c.post("/api/sessions", json={"quiz_id": qz["id"]}).json()
     check("Create session", sess.get("id") and sess["status"] == "waiting")
 
     sess_detail = c.get(f"/api/sessions/{sess['id']}").json()
@@ -117,18 +117,12 @@ def main():
     ended = c.put(f"/api/sessions/{sess['id']}/end").json()
     check("End session", ended["status"] == "finished" and ended["ended_at"] is not None)
 
-    # ── Results endpoints ──────────────────────────────────────────────────
-    print("\n=== Results ===")
-    results = c.get(f"/api/results/session/{sess['id']}").json()
-    check("Session results", results["session"]["id"] == sess["id"])
+    # ── Admin backup ────────────────────────────────────────────────────
+    print("\n=== Admin ===")
+    backup = c.post("/api/admin/backup").json()
+    check("Create backup", backup.get("path") and backup.get("size_bytes", 0) > 0)
 
-    analytics = c.get("/api/results/questions").json()
-    check("Question analytics (empty - no answers yet)", isinstance(analytics, list))
-
-    students = c.get("/api/results/students").json()
-    check("Student list (empty)", isinstance(students, list))
-
-    # ── Cleanup test: delete ──────────────────────────────────────────────
+    # ── Cleanup test: delete ─────────────────────────────────────────────
     print("\n=== Cleanup ===")
     r = c.delete(f"/api/sessions/{sess['id']}")
     check("Delete session", r.status_code == 204)

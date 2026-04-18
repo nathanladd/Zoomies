@@ -13,8 +13,8 @@ router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
 def _session_to_read(s: GameSession, player_count: int = 0, quiz_name: str | None = None) -> GameSessionRead:
     return GameSessionRead(
-        id=s.id, quiz_id=s.quiz_id, game_type=s.game_type,
-        status=s.status, current_q_index=s.current_q_index,
+        id=s.id, quiz_id=s.quiz_id,
+        status=s.status,
         started_at=s.started_at, ended_at=s.ended_at,
         player_count=player_count, quiz_name=quiz_name,
     )
@@ -61,7 +61,7 @@ async def create_session(body: GameSessionCreate, db: AsyncSession = Depends(get
     quiz = await db.get(Quiz, body.quiz_id)
     if not quiz:
         raise HTTPException(404, "Quiz not found")
-    s = GameSession(quiz_id=body.quiz_id, game_type=body.game_type)
+    s = GameSession(quiz_id=body.quiz_id)
     db.add(s)
     await db.commit()
     await db.refresh(s)

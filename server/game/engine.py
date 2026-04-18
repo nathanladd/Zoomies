@@ -3,13 +3,13 @@ import time
 from typing import Any
 
 from server.config import POINTS_MAX, POINTS_MIN, ELIMINATION_MARKS
-from server.games.base import BaseGame
-from server.games.pointdrop.scoring import calculate_points
-from server.games.pointdrop.elimination import build_elimination_schedule, get_elimination_at_mark
+from server.game.base import BaseGame
+from server.game.scoring import calculate_points
+from server.game.elimination import build_elimination_schedule, get_elimination_at_mark
 
 
 class QuestionState:
-    """Runtime state for a single question during a PointDrop game."""
+    """Runtime state for a single question during a Zündpunkt game."""
 
     def __init__(
         self,
@@ -123,8 +123,8 @@ class QuestionState:
         return display_choice
 
 
-class PointDropEngine(BaseGame):
-    """PointDrop game state machine."""
+class GameEngine(BaseGame):
+    """Zündpunkt game state machine."""
 
     def __init__(
         self,

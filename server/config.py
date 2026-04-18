@@ -4,7 +4,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 MEDIA_DIR = BASE_DIR / "media" / "questions"
 
-DATABASE_URL = f"sqlite+aiosqlite:///{DATA_DIR / 'cognit.db'}"
+DB_FILENAME = "zundpunkt.db"
+DB_PATH = DATA_DIR / DB_FILENAME
+DATABASE_URL = f"sqlite+aiosqlite:///{DB_PATH}"
 
 SERVER_HOST = "0.0.0.0"
 SERVER_PORT = 5000

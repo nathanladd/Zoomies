@@ -6,8 +6,8 @@ from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QFont, QColor, QPalette, QKeyEvent, QPixmap, QMouseEvent
 
 
-class DisplayWindow(QWidget):
-    """Fullscreen projector display for PointDrop games.
+class ProjectionWindow(QWidget):
+    """Fullscreen projection display for Zündpunkt games.
 
     Shows question text, optional image, timer, answer count, and leaderboard.
     Answer choices are NOT shown here — students see them on their own devices.
@@ -18,7 +18,7 @@ class DisplayWindow(QWidget):
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.session_id = session_id
         self.server_port = server_port
-        self.setWindowTitle("PointDrop - Display (F11 = fullscreen)")
+        self.setWindowTitle("Zündpunkt — Projection")
         self.setMinimumSize(1024, 700)
         self.setStyleSheet("background-color: #0f172a; color: white;")
 
@@ -28,7 +28,9 @@ class DisplayWindow(QWidget):
         self._player_names: list[str] = []
         self._drag_pos = None
         self._build_ui()
+        self._build_fullscreen_hint()
         self._show_waiting()
+        self._place_hint()
 
     # ── Frameless window dragging ──────────────────────────────────────────
 
@@ -57,10 +59,43 @@ class DisplayWindow(QWidget):
                 self.showNormal()
             else:
                 self.showFullScreen()
+            self._place_hint()
         elif event.key() == Qt.Key.Key_Escape and self.isFullScreen():
             self.showNormal()
+            self._place_hint()
         else:
             super().keyPressEvent(event)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._place_hint()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._place_hint()
+
+    # ── Fullscreen hint overlay ─────────────────────────────────────
+
+    def _build_fullscreen_hint(self):
+        self.fullscreen_hint = QLabel(
+            "Press F11 for fullscreen  ·  Esc to exit", self,
+        )
+        self.fullscreen_hint.setStyleSheet(
+            "color: #475569; background: transparent; font-size: 11px;"
+        )
+        self.fullscreen_hint.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.fullscreen_hint.adjustSize()
+
+    def _place_hint(self):
+        if not hasattr(self, "fullscreen_hint"):
+            return
+        margin = 10
+        self.fullscreen_hint.adjustSize()
+        x = self.width() - self.fullscreen_hint.width() - margin
+        y = self.height() - self.fullscreen_hint.height() - margin
+        self.fullscreen_hint.move(max(0, x), max(0, y))
+        self.fullscreen_hint.setVisible(not self.isFullScreen())
+        self.fullscreen_hint.raise_()
 
     def _build_ui(self):
         self.main_layout = QVBoxLayout(self)
@@ -209,7 +244,15 @@ class DisplayWindow(QWidget):
             )
         self.question_label.setText(
             f'<div style="text-align:center;">'
-            f'<div style="font-size:58px; font-weight:bold; color:#818cf8; margin-bottom:24px;">POINTDROP</div>'
+            f'<div style="font-size:58px; font-weight:bold; color:#818cf8; margin-bottom:8px;">ZÜNDPUNKT</div>'
+            f'<div style="font-size:18px; font-style:italic; color:#94a3b8; '
+            f'max-width:820px; margin:0 auto 4px auto; line-height:1.5;">'
+            f'Zündpunkt — the ignition point — the moment pressure and heat '
+            f'combine and something useful happens.'
+            f'</div>'
+            f'<div style="font-size:14px; color:#64748b; margin-bottom:28px;">'
+            f'(What I think Rudolf Diesel would call this game.)'
+            f'</div>'
             f'<div style="font-size:20px; color:#94a3b8; margin-bottom:4px;">Join at</div>'
             f'<div style="font-size:40px; font-weight:bold; color:#818cf8; margin-bottom:16px;">{self._join_url}</div>'
             f'<div style="font-size:32px; font-weight:bold; color:#34d399; margin-bottom:16px;">{session_text}</div>'

@@ -7,14 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.config import BASE_DIR, MEDIA_DIR
 from server.database import init_db, get_db
-from server.routers import topics, questions, quizzes, sessions, results
-from server.games.pointdrop.handlers import (
+from server.routers import topics, questions, quizzes, sessions, admin
+from server.game.handlers import (
     create_game, handle_student_ws, handle_instructor_ws,
 )
 
 # Ensure directories exist before mounting
-(BASE_DIR / "static" / "pointdrop" / "css").mkdir(parents=True, exist_ok=True)
-(BASE_DIR / "static" / "pointdrop" / "js").mkdir(parents=True, exist_ok=True)
+(BASE_DIR / "static" / "game" / "css").mkdir(parents=True, exist_ok=True)
+(BASE_DIR / "static" / "game" / "js").mkdir(parents=True, exist_ok=True)
 (BASE_DIR / "media" / "questions").mkdir(parents=True, exist_ok=True)
 
 
@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Cognit", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Zündpunkt", version="2.0.0", lifespan=lifespan)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
@@ -35,7 +35,7 @@ app.include_router(topics.router)
 app.include_router(questions.router)
 app.include_router(quizzes.router)
 app.include_router(sessions.router)
-app.include_router(results.router)
+app.include_router(admin.router)
 
 
 # ── HTML page routes ───────────────────────────────────────────────────────────
@@ -48,10 +48,10 @@ async def index():
     )
 
 
-@app.get("/pointdrop")
-async def pointdrop_game():
+@app.get("/play")
+async def play_game():
     return FileResponse(
-        str(BASE_DIR / "static" / "pointdrop" / "game.html"),
+        str(BASE_DIR / "static" / "game" / "game.html"),
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
 

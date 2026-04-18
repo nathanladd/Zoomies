@@ -1,34 +1,34 @@
-# Cognit
+# Zündpunkt
 
-Cognit is a modular educational assessment platform that manages question pools, builds quizzes/tests, tracks results, and hosts interactive games. Designed for classroom use on a local intranet.
+*The ignition point — the moment pressure and heat combine and something useful happens.*
+
+Zündpunkt is a classroom quiz game. Students join from their own browsers on the local network; the instructor runs one question at a time with a live timer, progressive answer elimination, and continuous scoring. A projection window shows the current question to the whole room while each student sees the answer choices on their own device.
 
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. Install dependencies
 
-```bash
+```powershell
 pip install -r requirements.txt
 ```
 
-### 2. Start the Server
+### 2. Start the server
 
-```bash
+```powershell
 python run_server.py
 ```
 
-The server runs at `http://localhost:5000`. The SQLite database and media directories are created automatically on first launch.
+The server runs at `http://localhost:5000`. The SQLite database (`data/zundpunkt.db`) and media folder are created automatically on first launch.
 
-### 3. Launch the Instructor App
+### 3. Launch the instructor app
 
-In a separate terminal:
-
-```bash
+```powershell
 python run_instructor.py
 ```
 
-### 4. Students Join
+### 4. Students join
 
-Students open a browser and navigate to `http://<instructor-ip>:5000` to join an active game session.
+Students open a browser and navigate to `http://<instructor-ip>:5000`, enter their name and the session number, and land on the game page.
 
 ## Architecture
 
@@ -36,35 +36,39 @@ Students open a browser and navigate to `http://<instructor-ip>:5000` to join an
 |-----------|------------|-------------|
 | **Backend** | FastAPI + uvicorn | REST API, WebSocket hub, game logic |
 | **Database** | SQLite + SQLAlchemy 2.0 (async) | Portable file-based storage |
-| **Instructor GUI** | PyQt6 | Desktop app for managing content and running games |
+| **Instructor GUI** | PyQt6 | Desktop app with tabs + projection window |
 | **Student UI** | HTML + TailwindCSS + JavaScript | Browser-based, works on any device |
 | **Real-time** | Native WebSocket | Live sync between server and all clients |
 
 ## Project Structure
 
 ```
-Cognit/
+Zündpunkt/
 ├── server/              # FastAPI backend
 │   ├── main.py          # App entry point
-│   ├── config.py        # Settings
+│   ├── config.py        # Settings + DB path
 │   ├── database.py      # Async SQLAlchemy setup
 │   ├── models.py        # ORM models
 │   ├── schemas.py       # Pydantic schemas
-│   ├── routers/         # REST API endpoints
+│   ├── routers/         # REST API (topics, questions, quizzes, sessions, admin)
 │   ├── websocket/       # Connection manager
-│   └── games/           # Game modules (extensible)
-│       └── pointdrop/   # PointDrop game engine
+│   └── game/            # Game engine
+│       ├── engine.py    # GameEngine state machine
+│       ├── scoring.py   # Square-root point decay
+│       ├── elimination.py
+│       ├── handlers.py  # WebSocket handlers
+│       └── base.py      # Abstract base
 ├── instructor/          # PyQt6 instructor application
-│   ├── main.py          # GUI entry point
+│   ├── main.py          # Tabs + Database menu (Backup / Restore)
 │   ├── api_client.py    # HTTP client to server
-│   ├── core/            # Topic, Question, Quiz, Results UI
-│   └── games/           # Game-specific UI
-│       └── pointdrop/   # Control panel + display window
+│   ├── core/            # Topic, Question, Quiz UI
+│   └── game/            # Control panel + projection window
 ├── static/              # Student web UI
 │   ├── index.html       # Join page
-│   └── pointdrop/       # PointDrop game pages
+│   └── game/            # Game page + css/ + js/
 ├── media/questions/     # Uploaded question images
 ├── data/                # SQLite database (auto-created)
+├── backups/             # Backup archives (auto-created)
 ├── requirements.txt
 ├── run_server.py
 └── run_instructor.py
@@ -72,14 +76,27 @@ Cognit/
 
 ## Features
 
-### Cognit Core
-- **Question Pool** — Create, edit, organize questions by topic with optional images
-- **Quiz Builder** — Assemble quizzes from the pool, reorder questions, toggle randomization
-- **Results Tracker** — Session logs, player scores, per-question analytics, student history
+- **Question pool** organized by topic, with optional images per question.
+- **Quiz builder** assembles quizzes from the pool, with drag-order and per-quiz order randomization.
+- **Live game** with progressive elimination (wrong answers disabled at 33% and 66% of the timer) and a square-root point-decay curve that keeps scores closer while still rewarding quick answers.
+- **Projection window** with join URL, session number, live timer, question text + image, and leaderboard. Frameless; press **F11** for fullscreen.
+- **No accounts** — students join with just their name and the session number.
+- **Database backup / restore** from the instructor app's *Database* menu, or via `POST /api/admin/backup` and `POST /api/admin/restore`. See `PLANNING.md` §12 for the full procedure.
 
-### PointDrop Game Module
-- **Live quiz game** with elimination mechanics and continuous scoring
-- **Progressive elimination** — wrong answers disabled at 33% and 66% time marks
-- **Continuous scoring** — points decrease by the millisecond (1000 → 100)
-- **Dual display** — instructor control panel + fullscreen projector window
-- **No accounts needed** — students join with just their name
+## Scoring
+
+Points follow a square-root decay curve between `POINTS_MAX = 1000` and `POINTS_MIN = 100`:
+
+```
+points = POINTS_MIN + (POINTS_MAX − POINTS_MIN) × √(remaining / total)
+```
+
+| Elapsed | Points |
+|---|---|
+| 0% | 1000 |
+| 25% | 879 |
+| 50% | 736 |
+| 75% | 550 |
+| 100% | 100 |
+
+Correct answer → earn the current point value. Wrong or no answer → 0 points for that question.

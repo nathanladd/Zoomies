@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QProcess, QObject
 
 from instructor.api_client import ApiClient
-from instructor.games.pointdrop.display_window import DisplayWindow
+from instructor.game.projection_window import ProjectionWindow
 
 
 def kill_port_processes(port: int = 5000):
@@ -135,18 +135,21 @@ class WebSocketThread(QThread):
         self._running = False
 
 
-class PointDropControlPanel(QWidget):
-    def __init__(self, api: ApiClient):
+class GameControlPanel(QWidget):
+    def __init__(self, api: ApiClient, server_process: QProcess | None = None):
         super().__init__()
         self.api = api
         self.ws_thread: WebSocketThread | None = None
-        self.display_window: DisplayWindow | None = None
+        self.projection_window: ProjectionWindow | None = None
         self.current_session_id: int | None = None
         self._players: dict[int, str] = {}  # player_id -> name
-        self._server_process: QProcess | None = None
+        self._server_process = server_process  # owned by MainWindow
         self._build_ui()
         self._setup_log_redirect()
-        kill_port_processes()  # clean up any zombie servers from previous runs
+        if self._server_process is not None:
+            self._server_process.readyReadStandardOutput.connect(self._read_server_output)
+            self._server_process.finished.connect(self._on_server_finished)
+            self.server_console.appendPlainText("--- Server running ---")
         self._refresh_quizzes()
 
     def _build_ui(self):
@@ -235,14 +238,14 @@ class PointDropControlPanel(QWidget):
         self._qa_choice_labels: list[QLabel] = []
         layout.addWidget(qa_group)
 
-        # ── Display Window Button ──────────────────────────────────────────
-        display_row = QHBoxLayout()
-        self.btn_display = QPushButton("Open Display Window")
-        self.btn_display.clicked.connect(self._toggle_display)
-        self.btn_display.setEnabled(False)
-        display_row.addWidget(self.btn_display)
-        display_row.addStretch()
-        layout.addLayout(display_row)
+        # ── Projection Window Button ───────────────────────────────────────
+        projection_row = QHBoxLayout()
+        self.btn_projection = QPushButton("Open Projection")
+        self.btn_projection.clicked.connect(self._toggle_projection)
+        self.btn_projection.setEnabled(False)
+        projection_row.addWidget(self.btn_projection)
+        projection_row.addStretch()
+        layout.addLayout(projection_row)
 
         # ── Bottom section: Leaderboard (left) + Consoles (right) ────────
         bottom_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -263,16 +266,9 @@ class PointDropControlPanel(QWidget):
         console_layout = QVBoxLayout(console_widget)
         console_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Server console
+        # Server console (server is started and owned by MainWindow)
         srv_group = QGroupBox("Server Console")
         srv_layout = QVBoxLayout(srv_group)
-        srv_btn_row = QHBoxLayout()
-        self.btn_server = QPushButton("Start Server")
-        self.btn_server.clicked.connect(self._toggle_server)
-        self.btn_server.setStyleSheet("font-weight: bold;")
-        srv_btn_row.addWidget(self.btn_server)
-        srv_btn_row.addStretch()
-        srv_layout.addLayout(srv_btn_row)
         self.server_console = QPlainTextEdit()
         self.server_console.setReadOnly(True)
         self.server_console.setMaximumBlockCount(500)
@@ -342,7 +338,7 @@ class PointDropControlPanel(QWidget):
         self.status_label.setText("Status: Connected (waiting for players)")
         self.btn_start.setEnabled(True)
         self.btn_end.setEnabled(True)
-        self.btn_display.setEnabled(True)
+        self.btn_projection.setEnabled(True)
 
     def _on_ws_disconnected(self):
         self.status_label.setText("Status: Disconnected")
@@ -361,8 +357,8 @@ class PointDropControlPanel(QWidget):
             if pid is not None:
                 self._players[pid] = name
             self._update_leaderboard_from_players()
-            if self.display_window:
-                self.display_window.on_player_joined(msg)
+            if self.projection_window:
+                self.projection_window.on_player_joined(msg)
 
         elif msg_type == "player_left":
             self.players_label.setText(f"Players: {msg.get('player_count', 0)}")
@@ -374,8 +370,8 @@ class PointDropControlPanel(QWidget):
             self.status_label.setText("Status: Game started!")
             self.btn_start.setEnabled(False)
             self.btn_next.setEnabled(True)
-            if self.display_window:
-                self.display_window.on_game_start(msg)
+            if self.projection_window:
+                self.projection_window.on_game_start(msg)
 
         elif msg_type == "question_start":
             idx = msg.get("index", 0)
@@ -385,8 +381,8 @@ class PointDropControlPanel(QWidget):
             self.btn_next.setEnabled(False)
             self.btn_reveal.setEnabled(True)
             self._show_question(msg)
-            if self.display_window:
-                self.display_window.on_question_start(msg)
+            if self.projection_window:
+                self.projection_window.on_question_start(msg)
 
         elif msg_type == "question_answer":
             self._highlight_correct(msg.get("correct_answer", ""))
@@ -395,25 +391,25 @@ class PointDropControlPanel(QWidget):
             remaining = msg.get("time_remaining_ms", 0)
             secs = remaining / 1000
             self.time_label.setText(f"Time: {secs:.1f}s | Pts: {msg.get('current_points', 0)}")
-            if self.display_window:
-                self.display_window.on_points_update(msg)
+            if self.projection_window:
+                self.projection_window.on_points_update(msg)
 
         elif msg_type == "choice_eliminated":
-            if self.display_window:
-                self.display_window.on_choice_eliminated(msg)
+            if self.projection_window:
+                self.projection_window.on_choice_eliminated(msg)
 
         elif msg_type == "answer_count":
             self.answers_label.setText(f"Answers: {msg.get('answered', 0)}/{msg.get('total', 0)}")
-            if self.display_window:
-                self.display_window.on_answer_count(msg)
+            if self.projection_window:
+                self.projection_window.on_answer_count(msg)
 
         elif msg_type == "question_end":
             self.btn_reveal.setEnabled(False)
             self.btn_next.setEnabled(True)
             self.time_label.setText("Time: -")
             self._update_leaderboard(msg.get("player_scores", []))
-            if self.display_window:
-                self.display_window.on_question_end(msg)
+            if self.projection_window:
+                self.projection_window.on_question_end(msg)
 
         elif msg_type == "game_end":
             self.status_label.setText("Status: Game finished!")
@@ -423,8 +419,8 @@ class PointDropControlPanel(QWidget):
             self._players.clear()
             self.lb_table.setRowCount(0)
             self._clear_question()
-            if self.display_window:
-                self.display_window.on_game_end(msg)
+            if self.projection_window:
+                self.projection_window.on_game_end(msg)
 
     def _start_game(self):
         if self.ws_thread:
@@ -446,18 +442,18 @@ class PointDropControlPanel(QWidget):
         if reply == QMessageBox.StandardButton.Yes and self.ws_thread:
             self.ws_thread.send({"type": "end_game"})
 
-    def _toggle_display(self):
-        if self.display_window and self.display_window.isVisible():
-            self.display_window.close()
-            self.display_window = None
-            self.btn_display.setText("Open Display Window")
+    def _toggle_projection(self):
+        if self.projection_window and self.projection_window.isVisible():
+            self.projection_window.close()
+            self.projection_window = None
+            self.btn_projection.setText("Open Projection")
         else:
-            self.display_window = DisplayWindow(
+            self.projection_window = ProjectionWindow(
                 session_id=self.current_session_id,
                 server_port=5000,
             )
-            self.display_window.show()
-            self.btn_display.setText("Close Display Window")
+            self.projection_window.show()
+            self.btn_projection.setText("Close Projection")
 
     def _update_leaderboard(self, scores: list[dict]):
         self.lb_table.setRowCount(len(scores))
@@ -517,38 +513,7 @@ class PointDropControlPanel(QWidget):
     def _append_instructor_log(self, text: str):
         self.instructor_console.appendPlainText(text.rstrip())
 
-    # ── Server process ────────────────────────────────────────────────────
-
-    def _toggle_server(self):
-        if self._server_process and self._server_process.state() != QProcess.ProcessState.NotRunning:
-            pid = self._server_process.processId()
-            if pid:
-                subprocess.run(
-                    ["taskkill", "/F", "/T", "/PID", str(pid)],
-                    capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
-                )
-            self._server_process.waitForFinished(2000)
-            kill_port_processes()  # final sweep
-            self.btn_server.setText("Start Server")
-            self.server_console.appendPlainText("--- Server stopped ---")
-        else:
-            self._start_server()
-
-    def _start_server(self):
-        kill_port_processes()  # ensure no stale server is occupying the port
-
-        self._server_process = QProcess(self)
-        self._server_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
-        self._server_process.readyReadStandardOutput.connect(self._read_server_output)
-        self._server_process.finished.connect(self._on_server_finished)
-
-        project_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        self._server_process.setWorkingDirectory(project_dir)
-
-        python = sys.executable
-        self._server_process.start(python, ["run_server.py"])
-        self.btn_server.setText("Stop Server")
-        self.server_console.appendPlainText("--- Starting server... ---")
+    # ── Server console (process is owned by MainWindow) ───────────────────────────
 
     def _read_server_output(self):
         if self._server_process:
@@ -560,26 +525,14 @@ class PointDropControlPanel(QWidget):
 
     def _on_server_finished(self, exit_code, exit_status):
         self.server_console.appendPlainText(f"--- Server exited (code {exit_code}) ---")
-        self.btn_server.setText("Start Server")
 
     def closeEvent(self, event):
         # Restore stdout
         if hasattr(self, '_log_stream') and self._log_stream._original:
             sys.stdout = self._log_stream._original
-        # Stop server process tree
-        if self._server_process and self._server_process.state() != QProcess.ProcessState.NotRunning:
-            pid = self._server_process.processId()
-            if pid:
-                subprocess.run(
-                    ["taskkill", "/F", "/T", "/PID", str(pid)],
-                    capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
-                )
-            self._server_process.waitForFinished(2000)
-        # Final sweep — kill anything still on port 5000
-        kill_port_processes()
         if self.ws_thread:
             self.ws_thread.stop()
             self.ws_thread.wait(2000)
-        if self.display_window:
-            self.display_window.close()
+        if self.projection_window:
+            self.projection_window.close()
         event.accept()

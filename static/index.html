@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cognit</title>
+    <title>Zündpunkt</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); min-height: 100vh; }
@@ -12,8 +12,8 @@
 </head>
 <body class="text-white flex items-center justify-center min-h-screen">
     <div class="text-center space-y-8 p-8">
-        <h1 class="text-6xl font-bold glow text-indigo-400">COGNIT</h1>
-        <p class="text-xl text-slate-300">Educational Assessment Platform</p>
+        <h1 class="text-6xl font-bold glow text-indigo-400">ZÜNDPUNKT</h1>
+        <p class="text-base italic text-slate-400 max-w-xl mx-auto">the ignition point — the moment pressure and heat combine and something useful happens</p>
 
         <div id="join-form" class="bg-slate-800/80 backdrop-blur rounded-2xl p-8 max-w-md mx-auto space-y-6 shadow-2xl border border-slate-700">
             <h2 class="text-2xl font-semibold">Join the Quiz</h2>
@@ -60,7 +60,7 @@
                 return;
             }
 
-            window.location.href = `/pointdrop?session=${sessionId}&name=${encodeURIComponent(name)}`;
+            window.location.href = `/play?session=${sessionId}&name=${encodeURIComponent(name)}`;
         }
 
         function showError(msg) {

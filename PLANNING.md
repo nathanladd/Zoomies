@@ -1,325 +1,235 @@
-# COGNIT — Educational Assessment Platform
+# ZÜNDPUNKT — Classroom Quiz Game
 
-## Complete Project Planning Document
+**Zündpunkt** — *the ignition point — the moment pressure and heat combine and something useful happens.*
+(What I think Rudolf Diesel would call this game.)
 
-**Version:** 2.0  
-**Date:** January 12, 2026  
+**Version:** 3.0
 **Platform:** Windows
+**Stack:** Python 3.12 · FastAPI · SQLite · PyQt6 · TailwindCSS
 
 ---
 
-# 1. PROJECT OVERVIEW
+# 1. Project Overview
 
-## 1.1 Platform Concept
+## 1.1 What it is
 
-**Cognit** is a modular educational assessment platform that manages question pools, builds quizzes/tests, tracks results, and hosts interactive games. It's designed to be extensible — new game modes and assessment types can be added over time while sharing the same question pool and results infrastructure.
+Zündpunkt is a single-purpose classroom quiz game for a local intranet. The instructor runs the app, projects one question at a time, and students join from their own browsers with just a name. Each question has a live countdown, progressive elimination of wrong answers, and a continuous point decay that rewards fast answers without leaving slower players too far behind. When the quiz ends, a leaderboard is shown; that's it.
 
-## 1.2 Modular Architecture
+## 1.2 What changed from the old design
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              COGNIT CORE                                     │
-│                                                                             │
-│   ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐             │
-│   │  Question Pool  │  │  Quiz Builder   │  │ Results Tracker │             │
-│   │  Management     │  │                 │  │                 │             │
-│   │                 │  │  - Build quizzes│  │  - Session logs │             │
-│   │  - Topics       │  │  - Select Q's   │  │  - Player scores│             │
-│   │  - Questions    │  │  - Order Q's    │  │  - Analytics    │             │
-│   │  - CRUD ops     │  │  - Edit later   │  │  - Export data  │             │
-│   └─────────────────┘  └─────────────────┘  └─────────────────┘             │
-│                                                                             │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                              GAME MODULES                                    │
-│                                                                             │
-│   ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐             │
-│   │   PointDrop     │  │   (Future)      │  │   (Future)      │             │
-│   │   Quiz Game     │  │   Standard Test │  │   Other Games   │             │
-│   │                 │  │                 │  │                 │             │
-│   │  - Elimination  │  │  - Timed tests  │  │  - Team modes   │             │
-│   │  - Live scoring │  │  - No scoring   │  │  - Tournaments  │             │
-│   │  - Leaderboard  │  │  - Review mode  │  │  - etc.         │             │
-│   └─────────────────┘  └─────────────────┘  └─────────────────┘             │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+This project was previously split into a "Cognit" platform shell and a "PointDrop" game module with post-game analytics (per-question aggregation, student history across sessions, etc.). Those have been collapsed into a single product called **Zündpunkt**, and analytics have been removed in favor of an in-game leaderboard only.
 
-## 1.3 Components
+Concretely:
 
-### Cognit Core
-- **Question Pool** — Master repository of questions organized by topics
-- **Quiz Builder** — Create assessments by selecting questions from the pool
-- **Results Tracker** — Store and analyze outcomes from all game sessions
-
-### PointDrop (Game Module)
-- **Live quiz game** with elimination mechanics and continuous scoring
-- Students compete in real-time on a local intranet
-- Game-show style with declining points and answer elimination
-
-## 1.4 Key Features
-
-**Cognit Core:**
-- **Question Pool Management** — Create, edit, and organize questions with optional images
-- **Topic Organization** — Categorize questions for easy filtering
-- **Quiz Builder** — Assemble quizzes from the question pool
-- **Results Tracking** — Store all session results for review and analysis
-- **Extensible** — Add new game modules without modifying the core
-
-**PointDrop Game:**
-- **Student Participation** — Students join with just their name (no accounts required)
-- **Live Game Show Mode** — One question at a time, all students answer simultaneously
-- **Progressive Elimination** — Wrong answers are disabled over time
-- **Continuous Scoring** — Points decrease by the millisecond to minimize ties
-- **Dual Display** — Instructor control panel + separate projector window
-- **Automatic Grading** — Instant scoring and leaderboard updates
+- One product name, one set of menus: **Zündpunkt**.
+- **No post-game analytics.** The `Answer` table, the `/api/results/*` endpoints, and the *Results* tab in the instructor app are gone.
+- **Simpler session schema.** `GameSession.game_type` and `GameSession.current_q_index` are removed. There is only one game.
+- **Flattened code layout.** `server/games/pointdrop/` → `server/game/`, `instructor/games/pointdrop/` → `instructor/game/`, `static/pointdrop/` → `static/game/`.
+- **Renamed "Display" window → "Projection" window** throughout the instructor app.
+- **Database filename:** `cognit.db` → `zundpunkt.db`.
+- **Route rename:** `/pointdrop` → `/play`.
+- **Backup / restore** of the question database is now a built-in feature (see §12).
 
 ---
 
-# 2. SYSTEM ARCHITECTURE
+# 2. System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         INSTRUCTOR'S COMPUTER                               │
 │                                                                             │
 │   ┌──────────────────┐   ┌──────────────────┐   ┌────────────────────────┐  │
-│   │  Admin Window    │   │  Display Window  │   │    FastAPI Server      │  │
+│   │  Admin Window    │   │ Projection Window│   │    FastAPI Server      │  │
 │   │  (PyQt6)         │   │  (PyQt6)         │   │    (uvicorn)           │  │
 │   │                  │   │                  │   │                        │  │
 │   │  - Manage Q's    │   │  - Fullscreen    │   │  - REST API            │  │
 │   │  - Build quizzes │   │  - Show question │   │  - WebSocket hub       │  │
 │   │  - Start/control │   │  - Timer + score │   │  - Game logic          │  │
-│   │  - View scores   │   │  - Leaderboard   │   │  - SQLite database     │  │
+│   │  - Leaderboard   │   │  - Leaderboard   │   │  - SQLite database     │  │
+│   │  - Backup menu   │   │  - F11 full      │   │  - Backup / restore    │  │
 │   └──────────────────┘   └──────────────────┘   └────────────────────────┘  │
 │            │                      │                        │                │
 │            └──────────────────────┴────────────────────────┘                │
 │                                   │                                         │
 └───────────────────────────────────┼─────────────────────────────────────────┘
-                                    │
                                     │ HTTP + WebSocket (port 5000)
                                     │ Local Intranet (Wi-Fi / Ethernet)
                                     │
         ┌───────────────────────────┼───────────────────────────┐
-        │                           │                           │
 ┌───────▼───────┐           ┌───────▼───────┐           ┌───────▼───────┐
 │    Student    │           │    Student    │           │    Student    │
-│    Laptop     │           │    Laptop     │           │    Laptop     │
-│   (Browser)   │           │   (Browser)   │           │   (Browser)   │
-│               │           │               │           │               │
+│    Browser    │           │    Browser    │           │    Browser    │
 │  - Join game  │           │  - Join game  │           │  - Join game  │
 │  - Answer Q's │           │  - Answer Q's │           │  - Answer Q's │
-│  - View score │           │  - View score │           │  - View score │
+│  - See score  │           │  - See score  │           │  - See score  │
 └───────────────┘           └───────────────┘           └───────────────┘
 ```
 
 ---
 
-# 3. TECHNOLOGY STACK
+# 3. Technology Stack
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
-| **Backend Framework** | FastAPI | REST API + native WebSocket support |
-| **ASGI Server** | uvicorn | Runs FastAPI with async capabilities |
+| **Backend framework** | FastAPI | REST API + native WebSocket support |
+| **ASGI server** | uvicorn | Runs FastAPI with async capabilities |
 | **Database** | SQLite | File-based, portable, no setup required |
-| **Async DB Driver** | aiosqlite | Non-blocking database operations |
+| **Async DB driver** | aiosqlite | Non-blocking database operations |
 | **ORM** | SQLAlchemy 2.0 (async) | Database models and queries |
-| **Validation** | Pydantic | Request/response data validation |
-| **Desktop GUI** | PyQt6 | Instructor admin and display windows |
-| **Student Interface** | HTML + CSS + JavaScript | Browser-based, works on any laptop |
-| **Styling** | TailwindCSS | Modern, responsive UI |
-| **Real-time Communication** | Native WebSocket | Instant sync between server and all clients |
-| **HTTP Client** | httpx | Instructor GUI to server communication |
-| **File Handling** | aiofiles | Async image upload/serving |
-| **Image Processing** | Pillow (optional) | Image validation and resizing |
+| **Validation** | Pydantic 2 | Request/response data validation |
+| **Desktop GUI** | PyQt6 | Instructor admin + projection windows |
+| **Student interface** | HTML + CSS + JS | Browser-based, works on any laptop |
+| **Styling** | TailwindCSS (CDN) | Modern responsive UI |
+| **Real-time** | Native WebSocket | Instant sync between server and clients |
+| **HTTP client** | httpx | Instructor GUI → server communication |
+| **File handling** | aiofiles | Async image upload/serving |
+| **Image processing** | Pillow (optional) | Image validation/resizing |
+| **Backup** | `sqlite3.Connection.backup()` + `zipfile` | Online DB backup bundled with media |
+
+`requirements.txt` lists the pinned minimums.
 
 ---
 
-# 4. DEPENDENCIES
-
-**requirements.txt:**
+# 4. Project Structure
 
 ```
-# FastAPI + Server
-fastapi>=0.109
-uvicorn[standard]>=0.27
-websockets>=12.0
-
-# Database
-sqlalchemy[asyncio]>=2.0
-aiosqlite>=0.19
-
-# Validation
-pydantic>=2.5
-
-# Desktop GUI
-PyQt6>=6.6
-
-# HTTP Client (for instructor app)
-httpx>=0.26
-
-# File Handling
-python-multipart>=0.0.6
-aiofiles>=23.2
-
-# Image Processing (optional)
-Pillow>=10.2
+Zündpunkt/
+│
+├── server/
+│   ├── __init__.py
+│   ├── main.py                    # FastAPI app entry point
+│   ├── config.py                  # Settings, DB_PATH, POINTS_*
+│   ├── database.py                # Async SQLAlchemy engine + init_db
+│   ├── models.py                  # ORM models (no Answer table)
+│   ├── schemas.py                 # Pydantic schemas
+│   │
+│   ├── routers/
+│   │   ├── topics.py              # CRUD for topics
+│   │   ├── questions.py           # CRUD for questions + image upload
+│   │   ├── quizzes.py             # CRUD for quizzes
+│   │   ├── sessions.py            # Session lifecycle
+│   │   └── admin.py               # Backup / restore endpoints
+│   │
+│   ├── websocket/
+│   │   └── manager.py             # WebSocket connection manager
+│   │
+│   └── game/                      # Game engine (single game, no more /games/ layer)
+│       ├── base.py                # Abstract BaseGame (kept for clarity)
+│       ├── engine.py              # GameEngine state machine
+│       ├── scoring.py             # Square-root point decay
+│       ├── elimination.py         # Answer elimination scheduling
+│       └── handlers.py            # WebSocket handlers (instructor + student)
+│
+├── instructor/
+│   ├── main.py                    # PyQt6 MainWindow + Database menu
+│   ├── api_client.py              # HTTP client to server
+│   │
+│   ├── core/                      # Tabs for content management
+│   │   ├── topic_manager.py
+│   │   ├── question_pool.py
+│   │   └── quiz_builder.py
+│   │
+│   └── game/                      # Game tab
+│       ├── control_panel.py       # GameControlPanel (live controls)
+│       └── projection_window.py   # ProjectionWindow (fullscreen display)
+│
+├── static/                        # Student web UI
+│   ├── index.html                 # Join page (name + session number)
+│   └── game/
+│       ├── game.html
+│       ├── css/styles.css
+│       └── js/game.js
+│
+├── media/
+│   └── questions/                 # Uploaded question images
+│
+├── data/
+│   └── zundpunkt.db               # SQLite database (auto-created)
+│
+├── backups/                       # Backup zip archives (auto-created)
+│
+├── requirements.txt
+├── run_server.py                  # Launch uvicorn server
+├── run_instructor.py              # Launch PyQt6 instructor app
+├── test_integration.py
+├── test_ws.py
+└── README.md
 ```
 
 ---
 
-# 5. QUESTION POOL & QUIZ BUILDER
+# 5. Question Pool & Quiz Builder
 
-## 5.1 Concept Overview
+## 5.1 Concept
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
-│                         QUESTION POOL                                   │
-│                    (Master repository of all questions)                 │
-│                                                                         │
-│   ┌───────────────┐   ┌───────────────┐   ┌───────────────┐              │
-│   │    Topic:     │   │    Topic:     │   │    Topic:     │              │
-│   │    Math       │   │   Science     │   │   History     │   ...        │
-│   ├───────────────┤   ├───────────────┤   ├───────────────┤              │
-│   │  Q1: 2+2=?    │   │  Q5: H2O is?  │   │  Q8: 1776?    │              │
-│   │  Q2: 5x3=?    │   │  Q6: Sun is?  │   │  Q9: WWII?    │              │
-│   │  Q3: 10/2=?   │   │  Q7: DNA?     │   │  Q10: Egypt?  │              │
-│   │  Q4: 7-3=?    │   │  ...         │   │  ...         │              │
-│   └───────────────┘   └───────────────┘   └───────────────┘              │
-│                                                                         │
+│                         QUESTION POOL                                     │
+│                    (Master repository of all questions)                   │
+│                                                                           │
+│   ┌───────────────┐   ┌───────────────┐   ┌───────────────┐               │
+│   │    Topic:     │   │    Topic:     │   │    Topic:     │               │
+│   │    Math       │   │   Science     │   │   History     │   ...         │
+│   ├───────────────┤   ├───────────────┤   ├───────────────┤               │
+│   │  Q1, Q2, …    │   │  Q5, Q6, …    │   │  Q8, Q9, …    │               │
+│   └───────────────┘   └───────────────┘   └───────────────┘               │
 └───────────────────────────────────────────────────────────────────────────┘
                     │                         │
                     ▼                         ▼
 ┌─────────────────────────────┐   ┌─────────────────────────────┐
-│  Quiz: "Math Test Ch.1"   │   │  Quiz: "Science Final"    │
+│  Quiz: "Math Test Ch.1"     │   │  Quiz: "Science Final"      │
 ├─────────────────────────────┤   ├─────────────────────────────┤
-│  1. Q1 (from Math)        │   │  1. Q5 (from Science)     │
-│  2. Q3 (from Math)        │   │  2. Q6 (from Science)     │
-│  3. Q2 (from Math)        │   │  3. Q7 (from Science)     │
+│  1. Q1 (from Math)          │   │  1. Q5 (from Science)       │
+│  2. Q3 (from Math)          │   │  2. Q6 (from Science)       │
+│  3. Q2 (from Math)          │   │  3. Q7 (from Science)       │
 └─────────────────────────────┘   └─────────────────────────────┘
-         (editable)                   (editable)
 ```
 
-## 5.2 Question Pool Management
+Questions exist independently in the pool. Quizzes are ordered selections of questions; the same question can appear in multiple quizzes.
 
-| Operation | Description |
-|-----------|-------------|
-| **Create** | Add new questions to the pool with topic assignment |
-| **Read** | Browse/search questions, filter by topic |
-| **Update** | Edit question text, choices, image, time, or topic |
-| **Delete** | Remove questions from pool (warns if used in quizzes) |
+## 5.2 Operations
 
-## 5.3 Topic Management
+| Scope | Operations |
+|---|---|
+| **Topics** | create / list / update / delete (questions are set to NULL topic on delete) |
+| **Questions** | create / list / filter by topic / update / delete; upload or remove an image |
+| **Quizzes** | create / list / update (name, description, randomize flag) / delete |
+| **Quiz questions** | add / remove / reorder |
 
-| Operation | Description |
-|-----------|-------------|
-| **Create** | Add new topics (e.g., "Algebra", "Chemistry", "Civil War") |
-| **Read** | List all topics with question counts |
-| **Update** | Rename topics |
-| **Delete** | Remove topics (must reassign or delete questions first) |
+## 5.3 Sessions (runtime only)
 
-## 5.4 Quiz Builder
-
-| Operation | Description |
-|-----------|-------------|
-| **Create** | New quiz with name and description |
-| **Add Questions** | Select questions from pool (any topic) |
-| **Reorder** | Drag-and-drop to change question order |
-| **Randomize Order** | Shuffle all questions into random order during quiz setup |
-| **Remove Questions** | Remove questions from quiz (stays in pool) |
-| **Edit** | Change quiz name, description, or questions at any time |
-| **Delete** | Remove quiz (questions remain in pool) |
-
-**Key Principle:** Questions exist independently in the pool. Quizzes are just ordered selections of questions. The same question can appear in multiple quizzes.
-
-## 5.5 Quiz Lifecycle & Results Tracking
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           QUIZ LIFECYCLE                                    │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│   QUIZ DEFINITION (saved, reusable)                                         │
-│   ┌─────────────────────────────┐                                           │
-│   │  Quiz: "Chapter 5 Review"   │                                           │
-│   │  - 10 questions selected    │                                           │
-│   │  - Saved in database        │                                           │
-│   └─────────────────────────────┘                                           │
-│                │                                                            │
-│                │  Can be administered multiple times                        │
-│                ▼                                                            │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                        GAME SESSIONS                                │   │
-│   │                                                                     │   │
-│   │  Session #1              Session #2              Session #3         │   │
-│   │  Jan 12, Period 1        Jan 12, Period 3        Jan 15, Period 1   │   │
-│   │  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐│   │
-│   │  │ Alice: 8500 pts │     │ Dan: 9200 pts   │     │ Alice: 9100 pts ││   │
-│   │  │ Bob: 7200 pts   │     │ Eve: 8800 pts   │     │ Grace: 8900 pts ││   │
-│   │  │ Carol: 6900 pts │     │ Frank: 7500 pts │     │ Henry: 8200 pts ││   │
-│   │  └─────────────────┘     └─────────────────┘     └─────────────────┘│   │
-│   │                                                                     │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                │                                                            │
-│                ▼                                                            │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                     RESULTS TRACKING                                │   │
-│   │                                                                     │   │
-│   │  Per Session:                    Per Student (by name):             │   │
-│   │  - Date/time administered        - All sessions participated in    │   │
-│   │  - All participants & scores     - Scores across sessions          │   │
-│   │  - Per-question breakdown        - Per-question performance        │   │
-│   │  - Game type used                - Progress over time              │   │
-│   │                                                                     │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-**Key Concepts:**
-
-| Concept | Description |
-|---------|-------------|
-| **Quiz** | A saved template — select questions once, administer many times |
-| **GameSession** | One instance of administering a quiz (e.g., "Period 1 on Jan 12") |
-| **Player** | A student's participation in one session (identified by name) |
-| **Answer** | Each student's response to each question in a session |
-
-**Results Queries:**
-- "Show me all sessions of Quiz X" → List of GameSessions
-- "Show me Alice's history" → Filter Players by name, join to sessions
-- "How did Period 1 do vs Period 3?" → Compare sessions
-- "Which questions are students missing most?" → Aggregate Answers by question
+A `GameSession` is a single instance of playing a quiz (e.g. "Period 1 on Jan 12"). Sessions hold `id`, `quiz_id`, `status` (`waiting` / `active` / `finished`), `started_at`, `ended_at`. Players attached to a session have a `name` and `total_score`. Per-answer response times are **not** persisted — the final leaderboard is the only retained outcome.
 
 ---
 
-# 6. DATABASE SCHEMA
+# 6. Database Schema
 
-## 6.1 Entity Relationship Diagram
+## 6.1 ER diagram
 
 ```
 ┌─────────────────────┐
 │       Topic         │
 ├─────────────────────┤
 │ id (PK)             │
-│ name                │
+│ name (unique)       │
 │ description         │
 │ created_at          │
-└─────────────────────┘
-         │
-         │ 1
-         │
-         ▼ N
+└──────────┬──────────┘
+           │ 1
+           │
+           ▼ N
 ┌─────────────────────┐         ┌─────────────────────┐
 │      Question       │         │        Quiz         │
 ├─────────────────────┤         ├─────────────────────┤
 │ id (PK)             │         │ id (PK)             │
 │ topic_id (FK)       │         │ name                │
 │ question_type       │         │ description         │
-│ text                │         │ created_at          │
-│ image_filename      │◄───┐    └─────────────────────┘
-│ correct_answer      │    │              │
-│ wrong_answer_1      │    │              │ 1
-│ wrong_answer_2 (?)  │    │              │
-│ wrong_answer_3 (?)  │    │              ▼ N
+│ text                │         │ randomize_order     │
+│ image_filename      │◄───┐    │ created_at          │
+│ correct_answer      │    │    └──────────┬──────────┘
+│ wrong_answer_1      │    │               │ 1
+│ wrong_answer_2 (?)  │    │               │
+│ wrong_answer_3 (?)  │    │               ▼ N
 │ time_seconds        │    │    ┌─────────────────────┐
 │ created_at          │    │    │    QuizQuestion     │
 └─────────────────────┘    │    ├─────────────────────┤
@@ -331,912 +241,387 @@ Pillow>=10.2
 
 ┌─────────────────────┐         ┌─────────────────────┐
 │    GameSession      │         │       Player        │
-├─────────────────────┤         ├─────────────────────┤
+├─────────────────────┤    1  N ├─────────────────────┤
 │ id (PK)             │◄────────│ session_id (FK)     │
-│ quiz_id (FK)        │    1  N │ id (PK)             │
+│ quiz_id (FK)        │         │ id (PK)             │
 │ status              │         │ name                │
-│ current_q_index     │         │ total_score         │
-│ started_at          │         │ joined_at           │
-│ ended_at            │         └─────────────────────┘
-└─────────────────────┘                   │
-         │                                │ 1
-         │ 1                              │
-         │                                ▼ N
-         │                      ┌─────────────────────┐
-         │                      │       Answer        │
-         │                      ├─────────────────────┤
-         └──────────────────────│ session_id (FK)     │
-                           N    │ player_id (FK)      │
-                                │ question_id (FK)    │
-                                │ id (PK)             │
-                                │ choice              │
-                                │ response_time_ms    │
-                                │ points_earned       │
-                                │ is_correct          │
-                                └─────────────────────┘
+│ started_at          │         │ total_score         │
+│ ended_at            │         │ joined_at           │
+└─────────────────────┘         └─────────────────────┘
 ```
 
-## 6.2 Table Definitions
+There is no `Answer` table. Correctness and per-answer points are computed in-memory inside the running `GameEngine` and only the cumulative `Player.total_score` is written to the DB.
+
+## 6.2 Tables
 
 ### Topic
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY | Auto-increment ID |
-| name | TEXT | NOT NULL, UNIQUE | Topic name (e.g., "Algebra") |
-| description | TEXT | NULLABLE | Optional description |
-| created_at | DATETIME | NOT NULL | Creation timestamp |
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER PK | autoincrement |
+| name | TEXT | NOT NULL, UNIQUE |
+| description | TEXT | nullable |
+| created_at | DATETIME | NOT NULL |
 
 ### Question
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY | Auto-increment ID |
-| topic_id | INTEGER | FOREIGN KEY, NULLABLE | Reference to Topic (optional) |
-| question_type | TEXT | NOT NULL, DEFAULT 'multiple_choice' | 'multiple_choice', 'true_false', or 'technician_ab' |
-| text | TEXT | NULLABLE | Question text (optional if image-only) |
-| image_filename | TEXT | NULLABLE | Filename of attached image |
-| correct_answer | TEXT | NOT NULL | The correct answer text |
-| wrong_answer_1 | TEXT | NOT NULL | First incorrect answer |
-| wrong_answer_2 | TEXT | NULLABLE | Second incorrect answer (NULL for true/false) |
-| wrong_answer_3 | TEXT | NULLABLE | Third incorrect answer (NULL for true/false) |
-| time_seconds | INTEGER | NOT NULL, DEFAULT 10 | Time limit (5-15 seconds) |
-| created_at | DATETIME | NOT NULL | Creation timestamp |
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER PK | autoincrement |
+| topic_id | INTEGER FK → topics.id | nullable, `ON DELETE SET NULL` |
+| question_type | TEXT | `multiple_choice` / `true_false` / `technician_ab` |
+| text | TEXT | nullable (image-only OK) |
+| image_filename | TEXT | nullable |
+| correct_answer | TEXT | NOT NULL |
+| wrong_answer_1 | TEXT | NOT NULL |
+| wrong_answer_2 | TEXT | nullable |
+| wrong_answer_3 | TEXT | nullable |
+| time_seconds | INTEGER | default 10, range 5–30 |
+| created_at | DATETIME | NOT NULL |
 
-**Question Types:**
+**Question types:**
 
-| Type | Answers | Elimination | Randomized |
-|------|---------|-------------|------------|
+| Type | Answers | Elimination | Randomized positions |
+|---|---|---|---|
 | `multiple_choice` | 4 (1 correct + 3 wrong) | Yes, at 33% and 66% | Yes |
-| `true_false` | 2 (True/False) | No | No |
-| `technician_ab` | 4 (fixed choices) | Yes, at 33% and 66% | No |
-
-**Technician A/B Format (ASE Style):**
-```
-Question: "A vehicle has [problem]. Technician A says [statement A].
-           Technician B says [statement B]. Who is correct?"
-
-Choices (always in this order):
-  A) Technician A only
-  B) Technician B only
-  C) Both Technician A and Technician B
-  D) Neither Technician A nor Technician B
-
-Correct answer stored as: 'A', 'B', 'C', or 'D'
-```
-
-**Randomization at Display Time:**
-- **Multiple choice:** All 4 answers shuffled into random A/B/C/D positions each session
-- **True/False:** Always A) True, B) False (fixed order)
-- **Technician A/B:** Always A) Tech A, B) Tech B, C) Both, D) Neither (fixed order)
-- Server tracks which position holds the correct answer
-- Elimination applies to multiple choice and technician_ab questions
+| `true_false` | 2 (True / False) | No | No (fixed A/B) |
+| `technician_ab` | 4 (fixed ASE choices) | Yes, at 33% and 66% | No (fixed A/B/C/D) |
 
 ### Quiz
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY | Auto-increment ID |
-| name | TEXT | NOT NULL | Quiz title |
-| description | TEXT | NULLABLE | Optional description |
-| randomize_order | BOOLEAN | NOT NULL, DEFAULT FALSE | Whether to shuffle question order each session |
-| created_at | DATETIME | NOT NULL | Creation timestamp |
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER PK | |
+| name | TEXT | NOT NULL |
+| description | TEXT | nullable |
+| randomize_order | BOOLEAN | default FALSE |
+| created_at | DATETIME | NOT NULL |
 
 ### QuizQuestion
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY | Auto-increment ID |
-| quiz_id | INTEGER | FOREIGN KEY | Reference to Quiz |
-| question_id | INTEGER | FOREIGN KEY | Reference to Question |
-| position | INTEGER | NOT NULL | Order in quiz (1, 2, 3...) |
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER PK | |
+| quiz_id | INTEGER FK → quizzes.id | `ON DELETE CASCADE` |
+| question_id | INTEGER FK → questions.id | `ON DELETE CASCADE` |
+| position | INTEGER | ordering inside the quiz |
 
 ### GameSession
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY | Auto-increment ID |
-| quiz_id | INTEGER | FOREIGN KEY | Reference to Quiz being played |
-| game_type | TEXT | NOT NULL | Game module used: 'pointdrop', 'standard_test', etc. |
-| status | TEXT | NOT NULL | waiting / active / finished |
-| current_q_index | INTEGER | NOT NULL | Current question position |
-| started_at | DATETIME | NULLABLE | When session started |
-| ended_at | DATETIME | NULLABLE | When session ended |
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER PK | |
+| quiz_id | INTEGER FK → quizzes.id | |
+| status | TEXT | `waiting` / `active` / `finished` |
+| started_at | DATETIME | nullable |
+| ended_at | DATETIME | nullable |
 
 ### Player
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY | Auto-increment ID |
-| session_id | INTEGER | FOREIGN KEY | Reference to GameSession |
-| name | TEXT | NOT NULL | Student's display name |
-| total_score | INTEGER | NOT NULL, DEFAULT 0 | Cumulative score |
-| joined_at | DATETIME | NOT NULL | When player joined |
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER PK | |
+| session_id | INTEGER FK → game_sessions.id | `ON DELETE CASCADE` |
+| name | TEXT | NOT NULL |
+| total_score | INTEGER | default 0 |
+| joined_at | DATETIME | NOT NULL |
 
-### Answer
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY | Auto-increment ID |
-| player_id | INTEGER | FOREIGN KEY | Reference to Player |
-| question_id | INTEGER | FOREIGN KEY | Reference to Question |
-| session_id | INTEGER | FOREIGN KEY | Reference to GameSession |
-| selected_answer | TEXT | NULLABLE | The answer text selected (not a letter) |
-| response_time_ms | INTEGER | NOT NULL | Milliseconds to answer |
-| points_earned | INTEGER | NOT NULL | Points awarded |
-| is_correct | BOOLEAN | NOT NULL | Whether answer was correct |
+## 6.3 Answer randomization
 
----
+1. Questions store correct + up to 3 wrong answers, no letter assignment.
+2. At game time the server shuffles the answers for `multiple_choice` into A/B/C/D and remembers which slot is correct for that session.
+3. `true_false` and `technician_ab` keep fixed letter order.
+4. Elimination picks random wrong answers at 33% and 66% of the timer; the correct answer is never eliminated.
+5. Students submit by text; the server compares the selection to `correct_answer`.
 
-## 6.3 Answer Randomization Flow
+## 6.4 Question-order randomization
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    DATABASE (Question Pool)                         │
-│                                                                     │
-│   Question #42:                                                     │
-│   - text: "What is the capital of France?"                         │
-│   - correct_answer: "Paris"                                         │
-│   - wrong_answer_1: "London"                                        │
-│   - wrong_answer_2: "Berlin"                                        │
-│   - wrong_answer_3: "Madrid"                                        │
-│                                                                     │
-└─────────────────────────────────┴─────────────────────────────────────┘
-                                  │
-                                  ▼  Server shuffles at display time
-                                  
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    GAME SESSION (Runtime)                           │
-│                                                                     │
-│   Displayed to students (randomized):                               │
-│   - A) Berlin                                                       │
-│   - B) Paris        ◄── correct (server tracks this)                │
-│   - C) Madrid                                                       │
-│   - D) London                                                       │
-│                                                                     │
-│   Elimination order (also randomized): D → A → (B & C remain)       │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-**How it works:**
-1. **Question stored** with correct + 3 wrong answers (no letter assignment)
-2. **Game starts** → server randomly assigns answers to A/B/C/D positions
-3. **Server remembers** which position has the correct answer for this session
-4. **Eliminations** → server picks random wrong answers to disable (not always A first)
-5. **Student answers** → server compares selected text to `correct_answer` field
-6. **Next question** → shuffle again with new random positions
+If `quiz.randomize_order = TRUE`, the server shuffles the `QuizQuestion` list at session start. The randomized order lives in memory for the session only — it is not persisted.
 
 ---
 
-## 6.4 Question Order Randomization
+# 7. Game Mechanics
 
-### Overview
-
-When `quiz.randomize_order = TRUE`, the server shuffles the question order at the start of each game session. This ensures students experience a different question sequence each time the quiz is administered, while maintaining consistent answer randomization for each question.
-
-### Randomization Flow
+## 7.1 Quiz lifecycle
 
 ```
-DATABASE (Quiz Definition)                     GAME SESSION (Runtime)
-                                                
-Quiz: "Chapter 5 Review"                        Session #1 (Jan 12):
-- randomize_order: TRUE                         - Q3, Q1, Q4, Q2, Q5
-- Questions in position order:                  Session #2 (Jan 15):
-  1. Q1: "What is 2+2?"                          - Q5, Q2, Q1, Q3, Q4
-  2. Q2: "What is 5x3?"                          Session #3 (Jan 20):
-  3. Q3: "What is 10/2?"                         - Q2, Q4, Q1, Q5, Q3
-  4. Q4: "What is 7-3?"
-  5. Q5: "What is 8+1?"
+SETUP            WAITING           ACTIVE              FINISHED
+  │                 │                 │                    │
+  ▼                 ▼                 ▼                    ▼
+Create         Students         Question Loop        Final leaderboard
+session         join            (per-question)       (rankings shown,
+                                                      session ends)
 ```
 
-### Implementation Logic
+Per question:
 
-1. **Quiz Creation**: Instructor sets `randomize_order = TRUE` in Quiz Builder
-2. **Session Start**: Server queries QuizQuestions ordered by `position`
-3. **Shuffle**: Python's `random.shuffle()` creates new question order
-4. **Session Storage**: Randomized order stored in memory for the session
-5. **Question Progression**: `GameSession.current_q_index` advances through shuffled list
-6. **Answer Tracking**: Each answer records the original `question_id` for analytics
+1. Show question.
+2. Start timer + points decay + elimination schedule.
+3. Collect answers as they arrive.
+4. Instructor reveals (or timer expires).
+5. Show correct answer + updated leaderboard on projection.
+6. Wait for instructor to advance.
 
-### Key Benefits
-
-- **Fair Assessment**: Different question orders reduce cheating potential
-- **Fresh Experience**: Students can't memorize question sequences
-- **Consistent Analytics**: Results tracked by original question IDs
-- **Flexible Design**: Instructors can toggle randomization per quiz
-
-### Technical Implementation
-
-```python
-# When starting a new game session
-async def start_session(quiz_id: int):
-    quiz = await get_quiz(quiz_id)
-    questions = await get_quiz_questions(quiz_id)  # Ordered by position
-    
-    if quiz.randomize_order:
-        random.shuffle(questions)  # In-place shuffle
-    
-    session = await create_game_session(
-        quiz_id=quiz_id,
-        question_order=[q.id for q in questions]  # Store shuffled order
-    )
-    
-    return session
-```
-
----
-
-# 7. GAME MECHANICS
-
-## 7.1 Quiz Flow
+## 7.2 Question timeline (10-second example)
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              QUIZ LIFECYCLE                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│   SETUP              WAITING            ACTIVE              FINISHED        │
-│     │                   │                  │                    │           │
-│     ▼                   ▼                  ▼                    ▼           │
-│  ┌──────┐          ┌──────────┐       ┌──────────┐        ┌──────────┐     │
-│  │Create│          │ Students │       │ Question │        │  Final   │     │
-│  │ Quiz │────────▶ │   Join   │─────▶ │   Loop   │──────▶ │ Results  │     │
-│  └──────┘          └──────────┘       └──────────┘        └──────────┘     │
-│                                             │                               │
-│                                             ▼                               │
-│                                    ┌─────────────────┐                      │
-│                                    │  For each Q:    │                      │
-│                                    │  1. Show Q      │                      │
-│                                    │  2. Timer runs  │                      │
-│                                    │  3. Eliminate   │                      │
-│                                    │  4. Collect A's │                      │
-│                                    │  5. Reveal ans  │                      │
-│                                    │  6. Show scores │                      │
-│                                    │  7. WAIT for    │                      │
-│                                    │     instructor  │                      │
-│                                    │  8. Next Q      │                      │
-│                                    └─────────────────┘                      │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+TIME:     0s         3s         6s         9s         10s
+          │          │          │          │          │
+POINTS:   1000 ─── 800 ─── 700 ─── 500 ──────────▶ 100
+          (square-root decay — see §7.3)
+CHOICES:  [A][B][C][D]   [B][C][D]    [B][D]
+                     │             │
+                     ▼             ▼
+                 Eliminate     Eliminate
+                    A             C
+                 (33%)         (66%)
 ```
 
-## 7.2 Single Question Timeline
+## 7.3 Scoring — square-root decay
+
+The previous build used a linear decay between max and min points. That made the score gap balloon quickly: a player answering at the half-way mark received only 55% of the max. The current scoring curve keeps scores closer together while still rewarding fast answers:
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  QUESTION TIMELINE (Example: 12-second question)                            │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  TIME:    0s        3s         6s         9s         12s                    │
-│           │         │          │          │          │                      │
-│           ▼         ▼          ▼          ▼          ▼                      │
-│           ├─────────┼──────────┼──────────┼──────────┤                      │
-│           │         │          │          │          │                      │
-│  POINTS:  1000 ───────────────────────────────────▶ 100                     │
-│           (decreasing continuously every ~100ms)                            │
-│                                                                             │
-│  CHOICES: [A][B][C][D]        [B][C][D]         [B][D]                      │
-│           4 available         3 available       2 available                 │
-│                     │                │                                      │
-│                     ▼                ▼                                      │
-│                 Eliminate        Eliminate                                  │
-│                    A                C                                       │
-│                 (wrong)          (wrong)                                    │
-│                                                                             │
-│  EVENTS:  Question        33%            66%                 Time           │
-│           Starts          mark           mark                Expires               │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+points = POINTS_MIN + (POINTS_MAX − POINTS_MIN) × √(remaining / total)
 ```
 
-## 7.3 Scoring System
-
-### Continuous Score Decay Formula
-
-```
-points = max_points - (elapsed_ms / total_ms) × (max_points - min_points)
-```
-
-### Configuration
+Configuration lives in `server/config.py`:
 
 | Parameter | Value |
-|-----------|-------|
-| Maximum Points | 1000 |
-| Minimum Points | 100 |
-| Decay Rate | Continuous (calculated per millisecond) |
+|---|---|
+| `POINTS_MAX` | 1000 |
+| `POINTS_MIN` | 100 |
 
-### Example Score Table (10-second question)
+Example for a 10-second question:
 
-| Response Time | Points Earned |
-|---------------|---------------|
-| 0.0 seconds | 1000 |
-| 1.0 seconds | 910 |
-| 2.0 seconds | 820 |
-| 3.0 seconds | 730 |
-| 4.0 seconds | 640 |
-| 5.0 seconds | 550 |
-| 6.0 seconds | 460 |
-| 7.0 seconds | 370 |
-| 8.0 seconds | 280 |
-| 9.0 seconds | 190 |
-| 10.0 seconds | 100 |
+| Elapsed | Linear (old) | √-curve (current) |
+|---|---|---|
+| 0.0s | 1000 | **1000** |
+| 2.5s | 775 | **879** |
+| 5.0s | 550 | **736** |
+| 7.5s | 325 | **550** |
+| 9.0s | 190 | **385** |
+| 10.0s | 100 | **100** |
 
-### Scoring Rules
+Correct answer → earn the current point value. Wrong or missing → 0.
 
-- **Correct answer** → Earn points based on response time
-- **Wrong answer** → 0 points
-- **No answer** → 0 points
-- **Ties** → Extremely rare due to millisecond precision
+## 7.4 Elimination
 
-## 7.4 Answer Elimination
-
-| Time Mark | Action | Choices Remaining |
-|-----------|--------|-------------------|
-| 0% | Question appears | 4 (A, B, C, D) |
+| Time mark | Action | Choices remaining |
+|---|---|---|
+| 0% | Question appears | 4 |
 | 33% | Eliminate 1 wrong answer | 3 |
 | 66% | Eliminate 1 wrong answer | 2 |
-| 100% | Time expires | 2 (student must choose) |
-| Post | Correct answer revealed | Instructor advances |
+| 100% | Timer expires, reveal | 2 |
 
-**Rules:**
-- Only **incorrect** answers are eliminated (never the correct one)
-- Elimination order is **randomized** each question
-- Students who haven't answered yet see disabled choices
-- Students who already answered are unaffected
-- **Quiz always ends with 2 choices** — student must earn final points by selecting correctly
-- **Correct answer is revealed** when timer expires
-- **Instructor manually advances** to the next question (no auto-advance)
+Correct answer is never eliminated. Students who have already answered see no change. Instructor manually advances (no auto-advance between questions).
 
-## 7.5 Per-Question Time Limits
+## 7.5 Per-question time limits
 
 | Setting | Value |
-|---------|-------|
-| Default | 10 seconds |
-| Minimum | 5 seconds |
-| Maximum | 30 seconds |
-| Configured | Per question in the pool |
+|---|---|
+| Default | 10 s |
+| Minimum | 5 s |
+| Maximum | 30 s |
 
 ---
 
-# 8. USER INTERFACES
+# 8. User Interfaces
 
-## 8.1 Student Screens
+## 8.1 Student flow
 
-### Screen 1: Join Page
+- **Join page** (`/`): big `ZÜNDPUNKT` banner, tagline, name + session number fields, "Join Game" button.
+- **Game page** (`/play?session=…&name=…`): waiting → question → locked → result → final leaderboard. WebSocket-driven, one screen active at a time.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                                                             │
-│                                                                             │
-│                               🎮 COGNIT                                     │
-│                                                                             │
-│                          Join the Quiz                                      │
-│                                                                             │
-│                     ┌─────────────────────────────┐                         │
-│                     │  Enter your name            │                         │
-│                     └─────────────────────────────┘                         │
-│                                                                             │
-│                          [ Join Game ]                                      │
-│                                                                             │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+## 8.2 Projection window (instructor)
 
-### Screen 2: Waiting Room
+The projection window is what the classroom sees. Frameless, dark background, `background-color: #0f172a`.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                                                             │
-│                               🎮 COGNIT                                     │
-│                                                                             │
-│                     Welcome, Johnny! ✓                                      │
-│                                                                             │
-│                     ┌─────────────────────────────┐                         │
-│                     │                             │                         │
-│                     │   ⏳ Waiting for quiz       │                         │
-│                     │      to start...            │                         │
-│                     │                             │                         │
-│                     │   12 players joined         │                         │
-│                     │                             │                         │
-│                     └─────────────────────────────┘                         │
-│                                                                             │
-│                     Players: Johnny, Sarah, Mike, Emma, ...                 │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+**Waiting screen contents (top → bottom):**
 
-### Screen 3: Active Question (All Choices Available)
+1. `ZÜNDPUNKT` header (large, indigo, with glow).
+2. Italic tagline: *Zündpunkt — the ignition point — the moment pressure and heat combine and something useful happens.*
+3. Smaller dim caption: *(What I think Rudolf Diesel would call this game.)*
+4. "Join at" + local IP + port.
+5. Session number.
+6. Player count + the joined names.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Question 3 of 10                                     ⏱️ 8s     💰 640 pts  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│                     ┌─────────────────────────────┐                         │
-│                     │                             │                         │
-│                     │      [ IMAGE HERE ]         │                         │
-│                     │    (if question has one)    │                         │
-│                     └─────────────────────────────┘                         │
-│                                                                             │
-│          What element is shown in this periodic table section?              │
-│                                                                             │
-│   ┌───────────────────────────────┐   ┌───────────────────────────────┐    │
-│   │                               │   │                               │    │
-│   │         A) Hydrogen           │   │         B) Helium             │    │
-│   │                               │   │                               │    │
-│   └───────────────────────────────┘   └───────────────────────────────┘    │
-│                                                                             │
-│   ┌───────────────────────────────┐   ┌───────────────────────────────┐    │
-│   │                               │   │                               │    │
-│   │         C) Lithium            │   │         D) Carbon             │    │
-│   │                               │   │                               │    │
-│   └───────────────────────────────┘   └───────────────────────────────┘    │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+**During a question:** progress counter, timer bar, current point value, question text, optional image, answer count (`18/24 students`). Answer choices are *not* shown — students see those on their own devices.
 
-### Screen 4: Choices Being Eliminated
+**After reveal / at game end:** correct-answer banner, leaderboard.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Question 3 of 10                                     ⏱️ 4s     💰 320 pts  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│                     ┌─────────────────────────────┐                         │
-│                     │      [ IMAGE HERE ]         │                         │
-│                     └─────────────────────────────┘                         │
-│                                                                             │
-│          What element is shown in this periodic table section?              │
-│                                                                             │
-│   ┌───────────────────────────────┐   ┌───────────────────────────────┐    │
-│   │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │   │                               │    │
-│   │ ░░░░░░░░ ELIMINATED ░░░░░░░░ │   │         B) Helium             │    │
-│   │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │   │                               │    │
-│   └───────────────────────────────┘   └───────────────────────────────┘    │
-│                                                                             │
-│   ┌───────────────────────────────┐   ┌───────────────────────────────┐    │
-│   │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │   │                               │    │
-│   │ ░░░░░░░░ ELIMINATED ░░░░░░░░ │   │         D) Carbon             │    │
-│   │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │   │                               │    │
-│   └───────────────────────────────┘   └───────────────────────────────┘    │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+**F11 hint:** a small dim label (`Press F11 for fullscreen · Esc to exit`) is pinned to the bottom-right corner whenever the window is in windowed mode, and automatically disappears when fullscreen. Implemented as a free-floating child `QLabel` repositioned in `resizeEvent` / `showEvent`.
 
-### Screen 5: Answer Submitted (Locked In)
+## 8.3 Instructor admin window
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Question 3 of 10                                     ⏱️ 3s     💰 280 pts  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│                     ┌─────────────────────────────┐                         │
-│                     │      [ IMAGE HERE ]         │                         │
-│                     └─────────────────────────────┘                         │
-│                                                                             │
-│          What element is shown in this periodic table section?              │
-│                                                                             │
-│   ┌───────────────────────────────┐   ╔═══════════════════════════════╗    │
-│   │ ░░░░░░░░ ELIMINATED ░░░░░░░░ │   ║   ✓ YOUR ANSWER               ║    │
-│   └───────────────────────────────┘   ║         B) Helium             ║    │
-│                                       ╚═══════════════════════════════╝    │
-│   ┌───────────────────────────────┐   ┌───────────────────────────────┐    │
-│   │ ░░░░░░░░ ELIMINATED ░░░░░░░░ │   │         D) Carbon             │    │
-│   └───────────────────────────────┘   └───────────────────────────────┘    │
-│                                                                             │
-│                      ⏳ Waiting for time to expire...                       │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+Tabs: **Topics**, **Questions**, **Quiz Builder**, **Game**. Plus a top-level **Database** menu with **Backup Database…** and **Restore Database…** items.
 
-### Screen 6: Answer Revealed — Correct
+Game tab contents:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Question 3 of 10                                              RESULTS      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│                          ✅ CORRECT!                                        │
-│                                                                             │
-│                         +730 points                                         │
-│                                                                             │
-│   ┌───────────────────────────────┐   ╔═══════════════════════════════╗    │
-│   │         A) Hydrogen           │   ║   ✓ CORRECT ANSWER            ║    │
-│   └───────────────────────────────┘   ║         B) Helium             ║    │
-│                                       ╚═══════════════════════════════╝    │
-│   ┌───────────────────────────────┐   ┌───────────────────────────────┐    │
-│   │         C) Lithium            │   │         D) Carbon             │    │
-│   └───────────────────────────────┘   └───────────────────────────────┘    │
-│                                                                             │
-│   ┌─────────────────────────────────────────────────────────────────────┐  │
-│   │   Your Score: 2,450 pts                         Rank: 3rd / 24      │  │
-│   └─────────────────────────────────────────────────────────────────────┘  │
-│                                                                             │
-│                  ⏳ Waiting for instructor to continue...                   │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Screen 7: Answer Revealed — Incorrect
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Question 3 of 10                                              RESULTS      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│                          ❌ INCORRECT                                       │
-│                                                                             │
-│                          +0 points                                          │
-│                                                                             │
-│   ┌───────────────────────────────┐   ╔═══════════════════════════════╗    │
-│   │         A) Hydrogen           │   ║   ✓ CORRECT ANSWER            ║    │
-│   └───────────────────────────────┘   ║         B) Helium             ║    │
-│                                       ╚═══════════════════════════════╝    │
-│   ┌───────────────────────────────┐   ┌───────────────────────────────┐    │
-│   │   ✗ YOUR ANSWER               │   │         D) Carbon             │    │
-│   │         C) Lithium            │   │                               │    │
-│   └───────────────────────────────┘   └───────────────────────────────┘    │
-│                                                                             │
-│   ┌─────────────────────────────────────────────────────────────────────┐  │
-│   │   Your Score: 1,700 pts                         Rank: 8th / 24      │  │
-│   └─────────────────────────────────────────────────────────────────────┘  │
-│                                                                             │
-│                  ⏳ Waiting for instructor to continue...                   │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Screen 8: Final Results
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                                                             │
-│                          🏆 QUIZ COMPLETE! 🏆                               │
-│                                                                             │
-│                          Your Final Score                                   │
-│                            6,250 pts                                        │
-│                                                                             │
-│                          🥉 3rd Place 🥉                                    │
-│                                                                             │
-│   ┌─────────────────────────────────────────────────────────────────────┐  │
-│   │   LEADERBOARD                                                       │  │
-│   ├─────────────────────────────────────────────────────────────────────┤  │
-│   │   🥇  1. Sarah              7,500 pts                               │  │
-│   │   🥈  2. Mike               6,750 pts                               │  │
-│   │   🥉  3. Johnny (You)       6,250 pts                               │  │
-│   │       4. Emma               5,500 pts                               │  │
-│   │       5. Alex               5,250 pts                               │  │
-│   │       ...                                                           │  │
-│   └─────────────────────────────────────────────────────────────────────┘  │
-│                                                                             │
-│                    Correct: 7/10    Accuracy: 70%                           │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+- Quiz selector + "Create Session"
+- Controls: Start Game · Next Question · Reveal Answer · End Game
+- Current-question panel (text + choices, correct answer highlighted after reveal)
+- **Open Projection** button (toggles the projection window)
+- Live leaderboard (left) + server console + instructor console (right), each collapsible via a splitter
 
 ---
 
-## 8.2 Instructor Display Window (Projector)
+# 9. REST API
 
-```
-┌────────────────────────────────────────────────────────────────────────────────┐
-│                                                              ⏱️ 8s            │
-│                                                           ████████░░░░░░░░░░░  │
-│                                                                                │
-│    Question 3 of 10                                           640 points       │
-│                                                                                │
-│   ┌──────────────────────────────────────────────────────────────────────────┐ │
-│   │                                                                          │ │
-│   │    What element is shown in this periodic table section?                 │ │
-│   │                                                                          │ │
-│   └──────────────────────────────────────────────────────────────────────────┘ │
-│                                                                                │
-│                        ┌──────────────────────────┐                            │
-│                        │                          │                            │
-│                        │      [ IMAGE HERE ]      │                            │
-│                        │                          │                            │
-│                        └──────────────────────────┘                            │
-│                                                                                │
-│    ┌───────────────────────────┐      ┌───────────────────────────┐           │
-│    │      A) Hydrogen          │      │      B) Helium            │           │
-│    └───────────────────────────┘      └───────────────────────────┘           │
-│                                                                                │
-│    ┌───────────────────────────┐      ┌───────────────────────────┐           │
-│    │  ░░░░ ELIMINATED ░░░░░░░░ │      │      D) Carbon            │           │
-│    └───────────────────────────┘      └───────────────────────────┘           │
-│                                                                                │
-│    Answers: 18/24 students                                                     │
-│                                                                                │
-└────────────────────────────────────────────────────────────────────────────────┘
-```
+All JSON. Base URL `http://<host>:5000`.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET/POST/PUT/DELETE | `/api/topics` | Topic CRUD |
+| GET/POST/PUT/DELETE | `/api/questions` | Question CRUD |
+| POST / DELETE | `/api/questions/{id}/image` | Image upload / remove |
+| GET/POST/PUT/DELETE | `/api/quizzes` | Quiz CRUD |
+| POST / PUT / DELETE | `/api/quizzes/{id}/questions…` | Add / reorder / remove |
+| GET/POST/PUT/DELETE | `/api/sessions` | Session CRUD + start / end |
+| POST | `/api/sessions/{id}/init-game` | Build in-memory `GameEngine` |
+| POST | `/api/admin/backup` | Create a backup zip (see §12) |
+| POST | `/api/admin/restore` | Restore from a backup zip (see §12) |
+
+WebSocket endpoints:
+
+- `ws://…/ws/instructor/{session_id}`
+- `ws://…/ws/student/{session_id}`
 
 ---
 
-## 8.3 Instructor Admin Window
-
-### Question Editor
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Cognit - Question Editor                                        [_][□][X]  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  Question Text:                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ What element is shown in this periodic table section?               │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-│  Image (optional):                                                          │
-│  ┌─────────────────────────┐                                                │
-│  │                         │   [ Browse... ]   [ Remove ]                   │
-│  │   📷 periodic.png       │                                                │
-│  │                         │                                                │
-│  └─────────────────────────┘                                                │
-│                                                                             │
-│  Time Limit:    ◀────────●──────▶    10 seconds                             │
-│                 5s                15s                                       │
-│                                                                             │
-│  Answer Choices:                                                            │
-│  A: [ Hydrogen          ]      B: [ Helium            ]                     │
-│  C: [ Lithium           ]      D: [ Carbon            ]                     │
-│                                                                             │
-│  Correct Answer:  ( ) A   (•) B   ( ) C   ( ) D                             │
-│                                                                             │
-│  Category: [ Chemistry        ▼ ]                                           │
-│                                                                             │
-│                        [ Cancel ]   [ Save Question ]                       │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Quiz Control Panel
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Cognit - Quiz Control                                           [_][□][X]  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  Quiz: Chemistry Chapter 5                          Status: ACTIVE          │
-│  Question: 3 of 10                                  Players: 24             │
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  Current Question:                                                  │   │
-│  │  "What element is shown in this periodic table section?"            │   │
-│  │                                                                     │   │
-│  │  Time Remaining: 8s          Answers Received: 18/24                │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-│  Controls:                                                                  │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │   ▶ START   │  │  ⏸ PAUSE   │  │  ⏭ SKIP    │  │  ⏹ END     │        │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
-│                                                                             │
-│  Live Leaderboard:                                                          │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  1. Sarah          2,180 pts                                        │   │
-│  │  2. Mike           2,050 pts                                        │   │
-│  │  3. Johnny         1,720 pts                                        │   │
-│  │  4. Emma           1,680 pts                                        │   │
-│  │  5. Alex           1,540 pts                                        │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-│  [ Open Display Window ]                              [ Export Results ]    │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-# 9. WEBSOCKET EVENTS
-
-## 9.1 Event Reference
+# 10. WebSocket Events
 
 | Event | Direction | Payload |
-|-------|-----------|---------|
-| `player_join` | Student → Server | `{name: string}` |
-| `player_joined` | Server → All | `{player_id, name, player_count}` |
-| `player_left` | Server → All | `{player_id, name, player_count}` |
-| `game_start` | Server → All | `{quiz_name, question_count}` |
-| `question_start` | Server → All | `{index, text, image_url, choices, time_seconds, max_points}` |
-| `points_update` | Server → All | `{current_points}` (sent every 100ms) |
-| `choice_eliminated` | Server → All | `{choice, remaining_choices}` |
-| `submit_answer` | Student → Server | `{choice, elapsed_ms}` |
-| `answer_confirmed` | Server → Student | `{choice, locked: true}` |
-| `answer_count` | Server → Instructor | `{answered, total}` |
-| `question_end` | Server → All | `{correct_choice, player_scores[]}` |
-| `game_end` | Server → All | `{final_rankings[], stats}` |
-
-## 9.2 Event Flow Diagram
-
-```
-INSTRUCTOR              SERVER                 STUDENTS (all)
-    │                      │                        │
-    │── select_quiz ──────▶│                        │
-    │                      │                        │
-    │                      │◀──── player_join ──────│
-    │◀─ player_joined ─────│───── player_joined ───▶│
-    │                      │                        │
-    │── start_game ───────▶│                        │
-    │                      │───── game_start ──────▶│
-    │                      │                        │
-    │                      │                        │
-    │  ╔════════════════════════════════════════╗  │
-    │  ║  REPEAT FOR EACH QUESTION              ║  │
-    │  ╠════════════════════════════════════════╣  │
-    │  ║                   │                    ║  │
-    │  ║   │── next_q ────▶│                    ║  │
-    │  ║   │               │── question_start ─▶│  │
-    │  ║   │               │                    ║  │
-    │  ║   │               │   [Timer runs]     ║  │
-    │  ║   │               │── points_update ──▶│  │
-    │  ║   │               │── choice_elim ────▶│  │
-    │  ║   │               │                    ║  │
-    │  ║   │               │◀── submit_answer ──│  │
-    │  ║   │◀─ answer_cnt ─│── answer_confirm ─▶│  │
-    │  ║   │               │                    ║  │
-    │  ║   │── reveal ────▶│                    ║  │
-    │  ║   │               │── question_end ───▶│  │
-    │  ║   │               │                    ║  │
-    │  ╚════════════════════════════════════════╝  │
-    │                      │                        │
-    │── end_game ─────────▶│                        │
-    │                      │────── game_end ───────▶│
-    │                      │                        │
-```
+|---|---|---|
+| `player_join` | student → server | `{name}` |
+| `join_confirmed` | server → student | `{player_id, name}` |
+| `player_joined` | server → all | `{player_id, name, player_count}` |
+| `player_left` | server → all | `{player_id, name, player_count}` |
+| `start_game` | instructor → server | `{}` |
+| `game_start` | server → all | `{quiz_name, question_count}` |
+| `next_question` | instructor → server | `{}` |
+| `question_start` | server → all | `{index, total, text, image_url, choices, time_seconds, max_points, question_type}` |
+| `question_answer` | server → instructor | `{correct_answer}` |
+| `points_update` | server → all | `{current_points, time_remaining_ms}` (sent ~10× / s) |
+| `choice_eliminated` | server → all | `{choice, remaining_choices}` |
+| `submit_answer` | student → server | `{choice, elapsed_ms}` |
+| `answer_confirmed` | server → student | `{choice, locked: true}` |
+| `answer_count` | server → instructor | `{answered, total}` |
+| `reveal` | instructor → server | `{}` |
+| `question_end` | server → all | `{correct_choice, player_scores[], answers_received, total_players}` |
+| `end_game` | instructor → server | `{}` |
+| `game_end` | server → all | `{final_rankings[], question_count, player_count}` |
 
 ---
 
-# 10. PROJECT STRUCTURE
-
-```
-Cognit/
-│
-├── server/
-│   ├── __init__.py
-│   ├── main.py                    # FastAPI app entry point
-│   ├── config.py                  # Settings (port, DB path, etc.)
-│   ├── database.py                # Async SQLAlchemy setup
-│   ├── models.py                  # ORM models (Cognit Core)
-│   ├── schemas.py                 # Pydantic request/response models
-│   │
-│   ├── routers/
-│   │   ├── __init__.py
-│   │   ├── topics.py              # CRUD for topics
-│   │   ├── questions.py           # CRUD for questions
-│   │   ├── quizzes.py             # CRUD for quizzes
-│   │   ├── sessions.py            # Session management
-│   │   └── results.py             # Results tracking & analytics
-│   │
-│   ├── websocket/
-│   │   ├── __init__.py
-│   │   ├── manager.py             # WebSocket connection manager
-│   │   └── base_handler.py        # Base game handler interface
-│   │
-│   └── games/                     # GAME MODULES (extensible)
-│       ├── __init__.py
-│       ├── base.py                # Abstract base game class
-│       │
-│       └── pointdrop/             # PointDrop game module
-│           ├── __init__.py
-│           ├── engine.py          # PointDrop game state machine
-│           ├── scoring.py         # Continuous decay scoring
-│           ├── elimination.py     # Answer elimination logic
-│           └── handlers.py        # PointDrop WebSocket handlers
-│
-├── instructor/
-│   ├── __init__.py
-│   ├── main.py                    # PyQt6 app entry point
-│   ├── api_client.py              # HTTP client to server
-│   │
-│   ├── core/                      # Cognit Core UI
-│   │   ├── __init__.py
-│   │   ├── topic_manager.py       # Topic CRUD
-│   │   ├── question_pool.py       # Question pool management
-│   │   ├── quiz_builder.py        # Quiz assembly
-│   │   └── results_viewer.py      # Session results & analytics
-│   │
-│   └── games/                     # Game-specific UI
-│       └── pointdrop/
-│           ├── __init__.py
-│           ├── control_panel.py   # Live PointDrop control
-│           └── display_window.py  # Fullscreen projector view
-│
-├── static/                        # Student web UI
-│   ├── index.html                 # Game selection / join page
-│   │
-│   └── pointdrop/                 # PointDrop student UI
-│       ├── game.html              # PointDrop game page
-│       ├── css/
-│       │   └── styles.css         # PointDrop styles
-│       └── js/
-│           └── game.js            # WebSocket + game UI
-│
-├── media/                         # Uploaded files
-│   └── questions/                 # Question images
-│       ├── q_001.png
-│       └── ...
-│
-├── data/
-│   └── cognit.db                  # SQLite database
-│
-├── requirements.txt               # Python dependencies
-├── run_server.py                  # Launch uvicorn server
-├── run_instructor.py              # Launch PyQt6 instructor app
-└── README.md                      # Project documentation
-```
-
----
-
-# 11. IMAGE HANDLING
-
-## 11.1 Supported Formats
-
-| Format | Extension |
-|--------|-----------|
-| PNG | .png |
-| JPEG | .jpg, .jpeg |
-| GIF | .gif |
-| WebP | .webp |
-
-## 11.2 Constraints
+# 11. Image Handling
 
 | Constraint | Value |
-|------------|-------|
+|---|---|
+| Supported formats | PNG, JPEG, GIF, WebP |
 | Maximum file size | 5 MB |
 | Maximum dimensions | 1920 × 1080 (optional resize) |
 | Storage location | `media/questions/` |
-| Naming convention | `q_{question_id}_{timestamp}.{ext}` |
+| Naming | `q_{question_id}_{timestamp}.{ext}` |
 
-## 11.3 Question Types
-
-| Type | text | image_filename |
-|------|------|----------------|
-| Text only | Filled | NULL |
-| Image only | Empty | Filled |
-| Text + Image | Filled | Filled |
+`Question.text` and `Question.image_filename` may each be filled or empty — a question may be text-only, image-only, or both.
 
 ---
 
-# 12. BUILD ORDER
+# 12. Database Backup & Restore
 
-| Phase | Component | Task | Description |
-|-------|-----------|------|-------------|
-| 1 | Setup | Project Setup | Create folder structure, requirements.txt |
-| 2 | Core | Database Models | SQLAlchemy models for Cognit Core |
-| 3 | Core | REST API | Topics, Questions, Quizzes, Results endpoints |
-| 4 | Core | Instructor UI | PyQt6 topic/question/quiz management |
-| 5 | Core | Results Tracker | Session logging and analytics |
-| 6 | PointDrop | Game Engine | Scoring, elimination, state machine |
-| 7 | PointDrop | WebSocket | Connection manager, PointDrop handlers |
-| 8 | PointDrop | Student UI | HTML/CSS/JS join and game pages |
-| 9 | PointDrop | Instructor UI | Control panel + display window |
-| 10 | All | Integration | Connect all components, test flow |
-| 11 | All | Polish | Error handling, edge cases, UX improvements |
+The database is small and irreplaceable once quizzes have been authored. Backing it up is therefore a first-class feature.
+
+## 12.1 What gets backed up
+
+- `data/zundpunkt.db` — the SQLite file (topics, questions, quizzes, quiz_questions, game_sessions, players).
+- `media/questions/` — image files referenced by `Question.image_filename`.
+
+Both must be bundled together; image filenames in the DB are useless without the files and vice versa.
+
+## 12.2 Backup zip layout
+
+```
+zundpunkt-<timestamp>.zip
+├── data/
+│   └── zundpunkt.db
+└── media/
+    └── questions/
+        ├── q_001_*.png
+        └── …
+```
+
+## 12.3 In-app backup
+
+**Instructor app → Database menu → Backup Database…**
+
+1. Instructor picks a destination zip path (default: `~/zundpunkt-<timestamp>.zip`).
+2. Instructor GUI calls `POST /api/admin/backup?path=<chosen>`.
+3. Server:
+   - Uses SQLite's online backup API (`sqlite3.Connection.backup(dst_conn)`) to copy the DB to a temp file without blocking writes.
+   - Writes the temp DB plus the contents of `media/questions/` into a `ZIP_DEFLATED` archive at the chosen path.
+   - Returns `{path, size_bytes, created_at}`.
+4. Instructor GUI shows a confirmation with the size.
+
+If no `path` query is provided, the server writes to `backups/zundpunkt-<timestamp>.zip` under the project root.
+
+## 12.4 In-app restore
+
+**Instructor app → Database menu → Restore Database…**
+
+1. Instructor confirms the replacement warning.
+2. Instructor picks a backup zip.
+3. Instructor GUI calls `POST /api/admin/restore` with `{path}`.
+4. Server:
+   - Moves the current `data/zundpunkt.db` and `media/questions/` into `data/pre-restore-<timestamp>/` so the previous state is recoverable.
+   - Extracts the zip over `data/` and `media/questions/`.
+   - Returns `{status, restored_from, previous_state, notice}` telling the instructor to **restart the server** (the running SQLAlchemy engine is still holding the old file handle).
+5. Instructor GUI shows the restart instruction.
+
+If the zip is malformed, the server rolls the safety copies back before returning a 400.
+
+## 12.5 Manual PowerShell procedure (fallback)
+
+Use this when the app isn't running or the user prefers a command-line workflow.
+
+**Backup:**
+
+```powershell
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$dest  = "backups\zundpunkt-$stamp"
+New-Item -ItemType Directory -Force -Path $dest | Out-Null
+Copy-Item "data\zundpunkt.db" "$dest\zundpunkt.db"
+Copy-Item "media\questions"  "$dest\questions" -Recurse
+Compress-Archive -Path "$dest\*" -DestinationPath "$dest.zip"
+```
+
+**Restore:**
+
+```powershell
+# Stop the server first!
+Expand-Archive -Path "backups\zundpunkt-<timestamp>.zip" -DestinationPath "."
+# Then start the server again.
+```
+
+## 12.6 Optional: rotating auto-backup
+
+Not implemented yet. Intended behavior: on server startup, if `backups/auto/zundpunkt-<YYYYMMDD>.db` doesn't exist for today, create it via the online backup API; keep the 14 most-recent daily files, delete older ones. Add as a small task in `server/main.py` lifespan.
 
 ---
 
-# 13. SUMMARY
+# 13. Build Status
 
-**Cognit** is a modular educational assessment platform featuring:
-
-**Cognit Core:**
-- **Question Pool Management** — Organized by topics with full CRUD
-- **Quiz Builder** — Assemble assessments from the question pool
-- **Results Tracking** — Store and analyze all session outcomes
-- **Extensible Architecture** — Add new game modules without modifying the core
-
-**PointDrop Game Module:**
-- **Game show mechanics** — Progressive elimination + continuous scoring
-- **Real-time competition** — All students answer simultaneously
-- **Dual display** — Control panel + fullscreen projector window
-- **Per-question time limits** — 5-30 seconds configurable
-
-**Technology:**
-- **FastAPI backend** with native WebSocket support
-- **SQLite database** for portable, file-based storage
-- **PyQt6 instructor application** with modular UI
-- **Browser-based student interface** accessible on any laptop
-
-**Future Expansion:**
-- Standard timed tests (no game mechanics)
-- Team competition modes
-- Tournament brackets
-- Additional game types
+| Area | Status |
+|---|---|
+| FastAPI backend + SQLAlchemy models | Done |
+| Topic / Question / Quiz REST API | Done |
+| Session REST API (simplified, no game_type) | Done |
+| Instructor PyQt6 app (Topics/Questions/Quizzes/Game tabs) | Done |
+| Game engine (elimination + √-decay scoring) | Done |
+| Projection window with Zündpunkt tagline + F11 hint | Done |
+| Student web UI (join + play + results) | Done |
+| Zündpunkt rename migration | Done |
+| Removal of Answer table + Results tab + analytics endpoints | Done |
+| `/api/admin/backup` + `/api/admin/restore` | Done |
+| Instructor Database menu (Backup / Restore) | Done |
+| Rotating auto-backups | Not started (optional) |
 
 ---
 
-*Document generated: January 12, 2026*
+# 14. Summary
+
+Zündpunkt is the ignition point — press, start a quiz, fire. One product, one name, one database, one game mode. Students on their own screens, the projection on the wall, live scoring that still cares about speed without punishing the slower half of the class, and a backup button in the menu so you never lose the quizzes you authored.

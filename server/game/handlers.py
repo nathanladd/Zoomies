@@ -8,16 +8,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.database import async_session
-from server.models import GameSession, Quiz, QuizQuestion, Player, Answer
-from server.games.pointdrop.engine import PointDropEngine
+from server.models import GameSession, Quiz, QuizQuestion, Player
+from server.game.engine import GameEngine
 from server.websocket.manager import manager
 
-# Active game engines: session_id -> PointDropEngine
-active_games: dict[int, PointDropEngine] = {}
+# Active game engines: session_id -> GameEngine
+active_games: dict[int, GameEngine] = {}
 
 
-async def create_game(session_id: int, db: AsyncSession) -> PointDropEngine:
-    """Initialize a PointDrop engine for the given session."""
+async def create_game(session_id: int, db: AsyncSession) -> GameEngine:
+    """Initialize a Zündpunkt game engine for the given session."""
     session = await db.get(GameSession, session_id)
     if not session:
         raise ValueError("Session not found")
@@ -50,7 +50,7 @@ async def create_game(session_id: int, db: AsyncSession) -> PointDropEngine:
             "question_type": q.question_type,
         })
 
-    engine = PointDropEngine(
+    engine = GameEngine(
         session_id=session_id,
         quiz_name=quiz.name,
         questions=questions,
@@ -60,12 +60,12 @@ async def create_game(session_id: int, db: AsyncSession) -> PointDropEngine:
     return engine
 
 
-def get_game(session_id: int) -> PointDropEngine | None:
+def get_game(session_id: int) -> GameEngine | None:
     return active_games.get(session_id)
 
 
 async def handle_student_ws(ws: WebSocket, session_id: int) -> None:
-    """Handle a student WebSocket connection for PointDrop."""
+    """Handle a student WebSocket connection for Zündpunkt."""
     print(f"[WS-STUDENT] Connection attempt for session {session_id}")
     engine = get_game(session_id)
     if not engine:
@@ -133,22 +133,12 @@ async def handle_student_ws(ws: WebSocket, session_id: int) -> None:
                 result = await engine.on_submit_answer(player_id, choice, elapsed_ms)
 
                 if "error" not in result:
-                    # Save answer and update score (short-lived session)
+                    # Update the player's cumulative score (no per-answer persistence)
                     async with async_session() as db:
-                        answer = Answer(
-                            player_id=player_id,
-                            question_id=engine.current_question.question_id if engine.current_question else 0,
-                            session_id=session_id,
-                            selected_answer=result.get("selected_answer_text"),
-                            response_time_ms=elapsed_ms,
-                            points_earned=result["points"],
-                            is_correct=result["is_correct"],
-                        )
-                        db.add(answer)
                         player_obj = await db.get(Player, player_id)
                         if player_obj:
                             player_obj.total_score = engine.players[player_id]["score"]
-                        await db.commit()
+                            await db.commit()
 
                     # Confirm to student
                     await manager.send_to_student(session_id, player_id, {
@@ -201,17 +191,8 @@ async def _update_session_status(session_id: int, status: str) -> None:
             await db.commit()
 
 
-async def _update_session_q_index(session_id: int, q_index: int) -> None:
-    """Update the current question index in the DB."""
-    async with async_session() as db:
-        session = await db.get(GameSession, session_id)
-        if session:
-            session.current_q_index = q_index
-            await db.commit()
-
-
 async def handle_instructor_ws(ws: WebSocket, session_id: int) -> None:
-    """Handle the instructor WebSocket connection for PointDrop."""
+    """Handle the instructor WebSocket connection for Zündpunkt."""
     print(f"[WS-INSTR] Connection attempt for session {session_id}")
     engine = get_game(session_id)
     if not engine:
@@ -257,8 +238,6 @@ async def handle_instructor_ws(ws: WebSocket, session_id: int) -> None:
                     active_games.pop(session_id, None)
                     break
                 else:
-                    await _update_session_q_index(session_id, engine.current_index)
-
                     student_count = manager.get_student_count(session_id)
                     print(f"[WS-INSTR] Broadcasting question_start to {student_count} students, choices={q_info.get('choices', [])}")
                     await manager.broadcast_to_all(session_id, {
@@ -320,7 +299,7 @@ async def handle_instructor_ws(ws: WebSocket, session_id: int) -> None:
         manager.disconnect_instructor(session_id)
 
 
-async def _question_timer_loop(session_id: int, engine: PointDropEngine) -> None:
+async def _question_timer_loop(session_id: int, engine: GameEngine) -> None:
     """Background task that sends points updates and fires eliminations."""
     try:
         while engine.current_question and not engine.current_question.is_expired:

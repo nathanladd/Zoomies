@@ -107,14 +107,11 @@ class QuizDetailRead(QuizRead):
 
 class GameSessionCreate(BaseModel):
     quiz_id: int
-    game_type: str = "pointdrop"
 
 class GameSessionRead(BaseModel):
     id: int
     quiz_id: int
-    game_type: str
     status: str
-    current_q_index: int
     started_at: datetime | None
     ended_at: datetime | None
     player_count: int = 0
@@ -135,39 +132,12 @@ class PlayerRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ── Answer ─────────────────────────────────────────────────────────────────────
+# ── Admin (backup / restore) ───────────────────────────────────────────────────
 
-class AnswerRead(BaseModel):
-    id: int
-    player_id: int
-    question_id: int
-    session_id: int
-    selected_answer: str | None
-    response_time_ms: int
-    points_earned: int
-    is_correct: bool
+class BackupResult(BaseModel):
+    path: str
+    size_bytes: int
+    created_at: datetime
 
-    model_config = {"from_attributes": True}
-
-
-# ── Results / Analytics ────────────────────────────────────────────────────────
-
-class SessionResultRead(BaseModel):
-    session: GameSessionRead
-    players: list[PlayerRead]
-    answers: list[AnswerRead]
-
-class QuestionAnalytics(BaseModel):
-    question_id: int
-    question_text: str | None
-    times_asked: int
-    times_correct: int
-    accuracy_pct: float
-    avg_response_time_ms: float
-
-class StudentHistory(BaseModel):
-    name: str
-    sessions_played: int
-    total_score: int
-    avg_score: float
-    sessions: list[PlayerRead]
+class RestoreRequest(BaseModel):
+    path: str

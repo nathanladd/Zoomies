@@ -18,7 +18,7 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         from server.models import (  # noqa: F401
             Topic, Question, Quiz, QuizQuestion,
-            GameSession, Player, Answer,
+            GameSession, Player,
         )
         await conn.run_sync(Base.metadata.create_all)
 

@@ -105,8 +105,8 @@ class ApiClient:
             params["status"] = status
         return self.client.get("/api/sessions", params=params).json()
 
-    def create_session(self, quiz_id: int, game_type: str = "pointdrop") -> dict[str, Any]:
-        return self.client.post("/api/sessions", json={"quiz_id": quiz_id, "game_type": game_type}).json()
+    def create_session(self, quiz_id: int) -> dict[str, Any]:
+        return self.client.post("/api/sessions", json={"quiz_id": quiz_id}).json()
 
     def init_game(self, session_id: int) -> dict[str, Any]:
         return self.client.post(f"/api/sessions/{session_id}/init-game").json()
@@ -120,19 +120,15 @@ class ApiClient:
     def delete_session(self, session_id: int) -> None:
         self.client.delete(f"/api/sessions/{session_id}")
 
-    # ── Results ────────────────────────────────────────────────────────────
+    # ── Admin (backup / restore) ────────────────────────────────────────────────────
 
-    def get_session_results(self, session_id: int) -> dict[str, Any]:
-        return self.client.get(f"/api/results/session/{session_id}").json()
+    def backup_database(self, path: str | None = None) -> dict[str, Any]:
+        params = {"path": path} if path else {}
+        resp = self.client.post("/api/admin/backup", params=params, timeout=60.0)
+        resp.raise_for_status()
+        return resp.json()
 
-    def get_question_analytics(self, topic_id: int | None = None) -> list[dict[str, Any]]:
-        params = {}
-        if topic_id is not None:
-            params["topic_id"] = topic_id
-        return self.client.get("/api/results/questions", params=params).json()
-
-    def get_student_history(self, name: str) -> dict[str, Any]:
-        return self.client.get(f"/api/results/student/{name}").json()
-
-    def list_student_histories(self) -> list[dict[str, Any]]:
-        return self.client.get("/api/results/students").json()
+    def restore_database(self, path: str) -> dict[str, Any]:
+        resp = self.client.post("/api/admin/restore", json={"path": path}, timeout=60.0)
+        resp.raise_for_status()
+        return resp.json()
