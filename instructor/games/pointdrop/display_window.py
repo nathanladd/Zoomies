@@ -15,7 +15,7 @@ class DisplayWindow(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Cognit - Display (F11 = fullscreen)")
+        self.setWindowTitle("PointDrop - Display (F11 = fullscreen)")
         self.setMinimumSize(1024, 700)
         self.setStyleSheet("background-color: #0f172a; color: white;")
 
@@ -133,7 +133,7 @@ class DisplayWindow(QWidget):
     # ── Screen states ──────────────────────────────────────────────────────
 
     def _show_waiting(self):
-        self.question_label.setText("COGNIT")
+        self.question_label.setText("POINTDROP")
         self.question_label.setFont(QFont("Segoe UI", 52, QFont.Weight.Bold))
         self.question_label.setStyleSheet("color: #818cf8; padding: 20px;")
         self.progress_label.setText("")
