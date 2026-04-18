@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 import sys
 import threading
 
@@ -12,6 +13,38 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QProcess, QObject
 
 from instructor.api_client import ApiClient
 from instructor.games.pointdrop.display_window import DisplayWindow
+
+
+def kill_port_processes(port: int = 5000):
+    """Kill any process currently listening on the given port (Windows)."""
+    try:
+        result = subprocess.run(
+            ["netstat", "-ano"],
+            capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        pids = set()
+        for line in result.stdout.splitlines():
+            if f":{port}" in line and "LISTENING" in line:
+                parts = line.split()
+                if parts:
+                    try:
+                        pids.add(int(parts[-1]))
+                    except ValueError:
+                        pass
+        my_pid = os.getpid()
+        for pid in pids:
+            if pid == my_pid or pid == 0:
+                continue
+            try:
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+                print(f"[SERVER] Killed stale process on port {port} (PID {pid})")
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 
 class LogStream(QObject):
@@ -113,6 +146,7 @@ class PointDropControlPanel(QWidget):
         self._server_process: QProcess | None = None
         self._build_ui()
         self._setup_log_redirect()
+        kill_port_processes()  # clean up any zombie servers from previous runs
         self._refresh_quizzes()
 
     def _build_ui(self):
@@ -487,16 +521,22 @@ class PointDropControlPanel(QWidget):
 
     def _toggle_server(self):
         if self._server_process and self._server_process.state() != QProcess.ProcessState.NotRunning:
-            self._server_process.terminate()
-            self._server_process.waitForFinished(3000)
-            if self._server_process.state() != QProcess.ProcessState.NotRunning:
-                self._server_process.kill()
+            pid = self._server_process.processId()
+            if pid:
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+            self._server_process.waitForFinished(2000)
+            kill_port_processes()  # final sweep
             self.btn_server.setText("Start Server")
             self.server_console.appendPlainText("--- Server stopped ---")
         else:
             self._start_server()
 
     def _start_server(self):
+        kill_port_processes()  # ensure no stale server is occupying the port
+
         self._server_process = QProcess(self)
         self._server_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self._server_process.readyReadStandardOutput.connect(self._read_server_output)
@@ -526,12 +566,17 @@ class PointDropControlPanel(QWidget):
         # Restore stdout
         if hasattr(self, '_log_stream') and self._log_stream._original:
             sys.stdout = self._log_stream._original
-        # Stop server process
+        # Stop server process tree
         if self._server_process and self._server_process.state() != QProcess.ProcessState.NotRunning:
-            self._server_process.terminate()
-            self._server_process.waitForFinished(3000)
-            if self._server_process.state() != QProcess.ProcessState.NotRunning:
-                self._server_process.kill()
+            pid = self._server_process.processId()
+            if pid:
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+            self._server_process.waitForFinished(2000)
+        # Final sweep — kill anything still on port 5000
+        kill_port_processes()
         if self.ws_thread:
             self.ws_thread.stop()
             self.ws_thread.wait(2000)
