@@ -42,12 +42,18 @@ app.include_router(results.router)
 
 @app.get("/")
 async def index():
-    return FileResponse(str(BASE_DIR / "static" / "index.html"))
+    return FileResponse(
+        str(BASE_DIR / "static" / "index.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @app.get("/pointdrop")
 async def pointdrop_game():
-    return FileResponse(str(BASE_DIR / "static" / "pointdrop" / "game.html"))
+    return FileResponse(
+        str(BASE_DIR / "static" / "pointdrop" / "game.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 # ── WebSocket endpoints ───────────────────────────────────────────────────────

@@ -42,29 +42,34 @@ class WebSocketThread(QThread):
 
     async def _connect(self):
         uri = f"ws://{self.host}:{self.port}/ws/instructor/{self.session_id}"
+        print(f"[INSTR-WS] Connecting to {uri}")
         try:
             async with websockets.connect(uri) as ws:
                 self._ws = ws
                 self._running = True
+                print(f"[INSTR-WS] Connected!")
                 self.connected.emit()
 
                 while self._running:
                     # Send any queued messages
                     while self._send_queue:
                         msg = self._send_queue.pop(0)
+                        print(f"[INSTR-WS] Sending: {msg}")
                         await ws.send(msg)
 
                     try:
                         raw = await asyncio.wait_for(ws.recv(), timeout=0.1)
                         data = json.loads(raw)
+                        print(f"[INSTR-WS] Received: {data.get('type', '?')}")
                         self.message_received.emit(data)
                     except asyncio.TimeoutError:
                         continue
-                    except Exception:
+                    except Exception as e:
+                        print(f"[INSTR-WS] recv error: {e}")
                         break
 
         except Exception as e:
-            pass
+            print(f"[INSTR-WS] Connection failed: {e}")
         finally:
             self._running = False
             self.disconnected.emit()

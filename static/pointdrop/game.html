@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cognit - PointDrop</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/static/pointdrop/css/styles.css">
+    <link rel="stylesheet" href="/static/pointdrop/css/styles.css?v=2">
 </head>
 <body class="bg-slate-900 text-white min-h-screen">
 
@@ -25,7 +25,7 @@
     </div>
 
     <!-- QUESTION SCREEN -->
-    <div id="screen-question" class="screen hidden">
+    <div id="screen-question" class="screen">
         <div class="max-w-4xl mx-auto p-4 space-y-4">
             <!-- Header -->
             <div class="flex justify-between items-center">
@@ -62,7 +62,7 @@
     </div>
 
     <!-- RESULT SCREEN (per question) -->
-    <div id="screen-result" class="screen hidden">
+    <div id="screen-result" class="screen">
         <div class="max-w-2xl mx-auto p-8 text-center space-y-6">
             <p id="q-progress-result" class="text-slate-400 text-lg"></p>
 
@@ -88,7 +88,7 @@
     </div>
 
     <!-- FINAL RESULTS SCREEN -->
-    <div id="screen-final" class="screen hidden">
+    <div id="screen-final" class="screen">
         <div class="max-w-2xl mx-auto p-8 text-center space-y-6">
             <h2 class="text-4xl font-bold text-amber-400">QUIZ COMPLETE!</h2>
 
@@ -111,6 +111,6 @@
         </div>
     </div>
 
-    <script src="/static/pointdrop/js/game.js"></script>
+    <script src="/static/pointdrop/js/game.js?v=2"></script>
 </body>
 </html>

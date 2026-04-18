@@ -40,16 +40,20 @@ function connect() {
 
     ws.onopen = () => {
         reconnectAttempts = 0;
+        updateStatus('Connected, joining...');
         ws.send(JSON.stringify({ type: 'player_join', name: PLAYER_NAME }));
     };
 
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
+        console.log('[WS] Received:', msg.type, msg);
+        updateStatus('Message: ' + msg.type);
         handleMessage(msg);
     };
 
     ws.onclose = (event) => {
         console.log('WebSocket closed', event.code, event.reason);
+        updateStatus('Disconnected: ' + event.code + ' ' + (event.reason || ''));
         if (!gameFinished && reconnectAttempts < MAX_RECONNECT) {
             reconnectAttempts++;
             const delay = Math.min(1000 * reconnectAttempts, 5000);
@@ -62,12 +66,24 @@ function connect() {
 
     ws.onerror = (err) => {
         console.error('WebSocket error', err);
+        updateStatus('Error connecting');
     };
 }
 
 function showDisconnected() {
     const el = document.getElementById('q-text');
     if (el) el.textContent = 'Connection lost. Please refresh the page.';
+}
+
+function updateStatus(text) {
+    let el = document.getElementById('ws-status');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'ws-status';
+        el.style.cssText = 'position:fixed;bottom:8px;left:8px;font-size:12px;color:#64748b;z-index:999;';
+        document.body.appendChild(el);
+    }
+    el.textContent = 'WS: ' + text;
 }
 
 // ── Message Handler ───────────────────────────────────────────────────────────

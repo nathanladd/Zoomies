@@ -66,17 +66,23 @@ def get_game(session_id: int) -> PointDropEngine | None:
 
 async def handle_student_ws(ws: WebSocket, session_id: int) -> None:
     """Handle a student WebSocket connection for PointDrop."""
+    print(f"[WS-STUDENT] Connection attempt for session {session_id}")
     engine = get_game(session_id)
     if not engine:
+        print(f"[WS-STUDENT] No active game for session {session_id}, closing")
+        await ws.accept()
         await ws.close(code=4000, reason="No active game for this session")
         return
 
+    await ws.accept()
+    print(f"[WS-STUDENT] Accepted for session {session_id}")
     player_id: int | None = None
 
     try:
         # Wait for join message
         raw = await ws.receive_text()
         data = json.loads(raw)
+        print(f"[WS-STUDENT] Received: {data}")
 
         if data.get("type") != "player_join":
             await ws.close(code=4001, reason="Expected player_join message")
@@ -95,9 +101,12 @@ async def handle_student_ws(ws: WebSocket, session_id: int) -> None:
             await db.refresh(player)
             player_id = player.id
 
-        # Register with connection manager and engine
-        await manager.connect_student(session_id, player_id, ws)
+        # Register with connection manager (skip accept — already accepted above)
+        if session_id not in manager.student_connections:
+            manager.student_connections[session_id] = {}
+        manager.student_connections[session_id][player_id] = ws
         join_info = await engine.on_player_join(player_id, name)
+        print(f"[WS-STUDENT] Player {player_id} ({name}) joined session {session_id}")
 
         # Confirm join to this student
         await manager.send_to_student(session_id, player_id, {
@@ -203,12 +212,16 @@ async def _update_session_q_index(session_id: int, q_index: int) -> None:
 
 async def handle_instructor_ws(ws: WebSocket, session_id: int) -> None:
     """Handle the instructor WebSocket connection for PointDrop."""
+    print(f"[WS-INSTR] Connection attempt for session {session_id}")
     engine = get_game(session_id)
     if not engine:
+        print(f"[WS-INSTR] No active game for session {session_id}")
+        await ws.accept()
         await ws.close(code=4000, reason="No active game for this session")
         return
 
     await manager.connect_instructor(session_id, ws)
+    print(f"[WS-INSTR] Connected for session {session_id}")
     timer_task: asyncio.Task | None = None
 
     try:
@@ -216,10 +229,13 @@ async def handle_instructor_ws(ws: WebSocket, session_id: int) -> None:
             raw = await ws.receive_text()
             msg = json.loads(raw)
             msg_type = msg.get("type")
+            print(f"[WS-INSTR] Received: {msg_type}")
 
             if msg_type == "start_game":
                 start_info = await engine.on_start()
                 await _update_session_status(session_id, "active")
+                student_count = manager.get_student_count(session_id)
+                print(f"[WS-INSTR] Broadcasting game_start to {student_count} students")
 
                 await manager.broadcast_to_all(session_id, {
                     "type": "game_start",
@@ -228,6 +244,7 @@ async def handle_instructor_ws(ws: WebSocket, session_id: int) -> None:
 
             elif msg_type == "next_question":
                 q_info = await engine.on_next_question()
+                print(f"[WS-INSTR] next_question result: {'None (no more)' if q_info is None else 'Q' + str(q_info.get('index', '?'))}")
                 if q_info is None:
                     # No more questions — end game
                     end_info = await engine.on_end()
@@ -242,6 +259,8 @@ async def handle_instructor_ws(ws: WebSocket, session_id: int) -> None:
                 else:
                     await _update_session_q_index(session_id, engine.current_index)
 
+                    student_count = manager.get_student_count(session_id)
+                    print(f"[WS-INSTR] Broadcasting question_start to {student_count} students, choices={q_info.get('choices', [])}")
                     await manager.broadcast_to_all(session_id, {
                         "type": "question_start",
                         **q_info,
@@ -283,9 +302,11 @@ async def handle_instructor_ws(ws: WebSocket, session_id: int) -> None:
                 })
 
     except WebSocketDisconnect:
-        pass
-    except Exception:
-        pass
+        print(f"[WS-INSTR] Instructor disconnected from session {session_id}")
+    except Exception as e:
+        print(f"[WS-INSTR] Error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         if timer_task and not timer_task.done():
             timer_task.cancel()

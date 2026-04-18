@@ -1,83 +1,21 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGridLayout,
-    QProgressBar, QFrame, QSizePolicy,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QProgressBar, QFrame, QSizePolicy, QSplitter,
 )
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QFont, QColor, QPalette, QKeyEvent
-
-
-class ChoiceLabel(QFrame):
-    """A styled label representing one answer choice."""
-
-    def __init__(self, text: str = "", color: str = "#dc2626"):
-        super().__init__()
-        self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setMinimumHeight(70)
-        self.setStyleSheet(f"""
-            QFrame {{
-                background-color: {color};
-                border-radius: 12px;
-                padding: 12px;
-            }}
-        """)
-
-        layout = QVBoxLayout(self)
-        self.label = QLabel(text)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
-        self.label.setStyleSheet("color: white;")
-        self.label.setWordWrap(True)
-        layout.addWidget(self.label)
-
-        self._eliminated = False
-        self._base_color = color
-
-    def set_text(self, text: str):
-        self.label.setText(text)
-
-    def set_eliminated(self, eliminated: bool):
-        self._eliminated = eliminated
-        if eliminated:
-            self.setStyleSheet("""
-                QFrame {
-                    background-color: #374151;
-                    border-radius: 12px;
-                    padding: 12px;
-                    opacity: 0.3;
-                }
-            """)
-            self.label.setStyleSheet("color: #6b7280; text-decoration: line-through;")
-            self.label.setText("ELIMINATED")
-        else:
-            self.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {self._base_color};
-                    border-radius: 12px;
-                    padding: 12px;
-                }}
-            """)
-            self.label.setStyleSheet("color: white;")
-
-    def set_correct(self):
-        self.setStyleSheet("""
-            QFrame {
-                background-color: #059669;
-                border: 3px solid #10b981;
-                border-radius: 12px;
-                padding: 12px;
-            }
-        """)
-        self.label.setStyleSheet("color: white;")
+from PyQt6.QtGui import QFont, QColor, QPalette, QKeyEvent, QPixmap
 
 
 class DisplayWindow(QWidget):
-    """Fullscreen projector display for PointDrop games."""
+    """Fullscreen projector display for PointDrop games.
 
-    CHOICE_COLORS = ["#dc2626", "#2563eb", "#d97706", "#059669"]
+    Shows question text, optional image, timer, answer count, and leaderboard.
+    Answer choices are NOT shown here — students see them on their own devices.
+    """
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Cognit - Display")
+        self.setWindowTitle("Cognit - Display (F11 = fullscreen)")
         self.setMinimumSize(1024, 700)
         self.setStyleSheet("background-color: #0f172a; color: white;")
 
@@ -99,16 +37,16 @@ class DisplayWindow(QWidget):
     def _build_ui(self):
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(40, 20, 40, 20)
-        self.main_layout.setSpacing(16)
+        self.main_layout.setSpacing(12)
 
-        # Header
+        # ── Header row ─────────────────────────────────────────────────────
         header = QHBoxLayout()
         self.progress_label = QLabel("")
-        self.progress_label.setFont(QFont("Segoe UI", 16))
+        self.progress_label.setFont(QFont("Segoe UI", 18))
         self.progress_label.setStyleSheet("color: #94a3b8;")
 
         self.points_label = QLabel("")
-        self.points_label.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
+        self.points_label.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
         self.points_label.setStyleSheet("color: #34d399;")
         self.points_label.setAlignment(Qt.AlignmentFlag.AlignRight)
 
@@ -117,50 +55,48 @@ class DisplayWindow(QWidget):
         header.addWidget(self.points_label)
         self.main_layout.addLayout(header)
 
-        # Timer bar
+        # ── Timer bar ──────────────────────────────────────────────────────
         self.timer_bar = QProgressBar()
         self.timer_bar.setMaximum(1000)
         self.timer_bar.setValue(1000)
         self.timer_bar.setTextVisible(False)
-        self.timer_bar.setMaximumHeight(12)
+        self.timer_bar.setMaximumHeight(14)
         self.timer_bar.setStyleSheet("""
             QProgressBar {
                 background-color: #334155;
-                border-radius: 6px;
+                border-radius: 7px;
             }
             QProgressBar::chunk {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 #6366f1, stop:1 #10b981);
-                border-radius: 6px;
+                border-radius: 7px;
             }
         """)
         self.main_layout.addWidget(self.timer_bar)
 
-        # Question text
+        # ── Question text (large, centered) ────────────────────────────────
         self.question_label = QLabel("")
-        self.question_label.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
+        self.question_label.setFont(QFont("Segoe UI", 30, QFont.Weight.Bold))
         self.question_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.question_label.setWordWrap(True)
-        self.question_label.setStyleSheet("color: #e2e8f0; padding: 20px;")
+        self.question_label.setStyleSheet("color: #e2e8f0; padding: 24px;")
+        self.question_label.setMinimumHeight(120)
         self.main_layout.addWidget(self.question_label)
 
-        # Choices grid
-        self.choices_grid = QGridLayout()
-        self.choices_grid.setSpacing(16)
-        self.choice_widgets: list[ChoiceLabel] = []
-        for i in range(4):
-            cw = ChoiceLabel("", self.CHOICE_COLORS[i])
-            self.choice_widgets.append(cw)
-            self.choices_grid.addWidget(cw, i // 2, i % 2)
-        self.main_layout.addLayout(self.choices_grid)
+        # ── Question image ─────────────────────────────────────────────────
+        self.image_label = QLabel()
+        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.image_label.setStyleSheet("padding: 8px;")
+        self.image_label.hide()
+        self.main_layout.addWidget(self.image_label)
 
-        # Footer info
+        # ── Footer info row ────────────────────────────────────────────────
         footer = QHBoxLayout()
         self.answers_label = QLabel("")
-        self.answers_label.setFont(QFont("Segoe UI", 14))
+        self.answers_label.setFont(QFont("Segoe UI", 16))
         self.answers_label.setStyleSheet("color: #94a3b8;")
         self.timer_text = QLabel("")
-        self.timer_text.setFont(QFont("Segoe UI", 28, QFont.Weight.Bold))
+        self.timer_text.setFont(QFont("Segoe UI", 36, QFont.Weight.Bold))
         self.timer_text.setStyleSheet("color: #fbbf24;")
         self.timer_text.setAlignment(Qt.AlignmentFlag.AlignRight)
         footer.addWidget(self.answers_label)
@@ -168,34 +104,47 @@ class DisplayWindow(QWidget):
         footer.addWidget(self.timer_text)
         self.main_layout.addLayout(footer)
 
-        # Center message (for waiting/results)
-        self.center_message = QLabel("")
-        self.center_message.setFont(QFont("Segoe UI", 32, QFont.Weight.Bold))
-        self.center_message.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.center_message.setStyleSheet("color: #818cf8;")
-        self.center_message.hide()
-        self.main_layout.addWidget(self.center_message)
+        # ── Correct answer reveal label ────────────────────────────────────
+        self.correct_label = QLabel("")
+        self.correct_label.setFont(QFont("Segoe UI", 26, QFont.Weight.Bold))
+        self.correct_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.correct_label.setStyleSheet(
+            "color: #10b981; background-color: #064e3b; border-radius: 12px; padding: 16px;"
+        )
+        self.correct_label.hide()
+        self.main_layout.addWidget(self.correct_label)
 
-        # Leaderboard area
+        # ── Leaderboard area ──────────────────────────────────────────────
+        self.lb_title = QLabel("")
+        self.lb_title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        self.lb_title.setStyleSheet("color: #818cf8; padding-top: 8px;")
+        self.lb_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_title.hide()
+        self.main_layout.addWidget(self.lb_title)
+
         self.leaderboard_widget = QWidget()
         self.lb_layout = QVBoxLayout(self.leaderboard_widget)
+        self.lb_layout.setSpacing(2)
         self.leaderboard_widget.hide()
         self.main_layout.addWidget(self.leaderboard_widget)
 
+        self.main_layout.addStretch()
+
+    # ── Screen states ──────────────────────────────────────────────────────
+
     def _show_waiting(self):
         self.question_label.setText("COGNIT")
-        self.question_label.setStyleSheet("color: #818cf8; font-size: 48px; padding: 20px;")
+        self.question_label.setFont(QFont("Segoe UI", 52, QFont.Weight.Bold))
+        self.question_label.setStyleSheet("color: #818cf8; padding: 20px;")
         self.progress_label.setText("")
         self.points_label.setText("")
         self.timer_bar.hide()
         self.timer_text.setText("")
         self.answers_label.setText("Waiting for players...")
-        for cw in self.choice_widgets:
-            cw.hide()
-
-    def _show_choices(self):
-        for cw in self.choice_widgets:
-            cw.show()
+        self.image_label.hide()
+        self.correct_label.hide()
+        self.lb_title.hide()
+        self.leaderboard_widget.hide()
 
     # ── Event handlers called by the control panel ─────────────────────────
 
@@ -204,14 +153,15 @@ class DisplayWindow(QWidget):
 
     def on_game_start(self, msg: dict):
         self.question_label.setText("Get Ready!")
-        self.question_label.setStyleSheet("color: #e2e8f0; font-size: 36px; padding: 20px;")
+        self.question_label.setFont(QFont("Segoe UI", 40, QFont.Weight.Bold))
+        self.question_label.setStyleSheet("color: #e2e8f0; padding: 20px;")
 
     def on_question_start(self, msg: dict):
         self.timer_bar.show()
         self.timer_bar.setValue(1000)
-        self._show_choices()
         self.leaderboard_widget.hide()
-        self.center_message.hide()
+        self.lb_title.hide()
+        self.correct_label.hide()
 
         idx = msg.get("index", 0)
         total = msg.get("total", 0)
@@ -219,20 +169,33 @@ class DisplayWindow(QWidget):
         self.points_label.setText(f"{msg.get('max_points', 1000)} points")
 
         self.question_label.setText(msg.get("text") or "")
-        self.question_label.setStyleSheet("color: #e2e8f0; font-size: 24px; padding: 20px;")
+        self.question_label.setFont(QFont("Segoe UI", 30, QFont.Weight.Bold))
+        self.question_label.setStyleSheet("color: #e2e8f0; padding: 24px;")
 
-        choices = msg.get("choices", [])
-        for i, cw in enumerate(self.choice_widgets):
-            if i < len(choices):
-                cw.set_text(choices[i])
-                cw.set_eliminated(False)
-                cw.show()
-            else:
-                cw.hide()
+        # Show image if provided
+        image_url = msg.get("image_url")
+        if image_url:
+            try:
+                import os
+                from server.config import BASE_DIR
+                img_path = str(BASE_DIR / image_url.lstrip("/"))
+                pixmap = QPixmap(img_path)
+                if not pixmap.isNull():
+                    scaled = pixmap.scaledToHeight(
+                        min(350, pixmap.height()),
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                    self.image_label.setPixmap(scaled)
+                    self.image_label.show()
+                else:
+                    self.image_label.hide()
+            except Exception:
+                self.image_label.hide()
+        else:
+            self.image_label.hide()
 
         self.timer_text.setText(f"{msg.get('time_seconds', 10)}s")
         self.answers_label.setText("Answers: 0/?")
-
         self._current_time_seconds = msg.get("time_seconds", 10)
 
     def on_points_update(self, msg: dict):
@@ -247,10 +210,7 @@ class DisplayWindow(QWidget):
         self.timer_text.setText(f"{secs:.0f}s")
 
     def on_choice_eliminated(self, msg: dict):
-        choice = msg.get("choice", "")
-        for cw in self.choice_widgets:
-            if cw.label.text() == choice:
-                cw.set_eliminated(True)
+        pass
 
     def on_answer_count(self, msg: dict):
         self.answers_label.setText(f"Answers: {msg.get('answered', 0)}/{msg.get('total', 0)}")
@@ -260,39 +220,42 @@ class DisplayWindow(QWidget):
         self.timer_bar.hide()
         self.timer_text.setText("")
         self.points_label.setText("")
+        self.image_label.hide()
 
-        for cw in self.choice_widgets:
-            if cw.label.text() == correct or (cw._eliminated and False):
-                pass
-            if not cw._eliminated:
-                if cw.label.text() == correct:
-                    cw.set_correct()
+        # Show the correct answer prominently
+        self.correct_label.setText(f"Correct Answer:  {correct}")
+        self.correct_label.show()
 
         self.answers_label.setText(
             f"Answers: {msg.get('answers_received', 0)}/{msg.get('total_players', 0)}"
         )
 
-        # Show mini leaderboard
+        # Show leaderboard
         scores = msg.get("player_scores", [])
-        self._show_leaderboard(scores[:5])
+        self.lb_title.setText("Leaderboard")
+        self.lb_title.show()
+        self._show_leaderboard(scores[:8])
 
     def on_game_end(self, msg: dict):
         self.timer_bar.hide()
-        for cw in self.choice_widgets:
-            cw.hide()
+        self.image_label.hide()
+        self.correct_label.hide()
 
         self.question_label.setText("GAME OVER!")
-        self.question_label.setStyleSheet("color: #fbbf24; font-size: 48px; padding: 20px;")
+        self.question_label.setFont(QFont("Segoe UI", 52, QFont.Weight.Bold))
+        self.question_label.setStyleSheet("color: #fbbf24; padding: 20px;")
         self.progress_label.setText("")
         self.points_label.setText("")
         self.timer_text.setText("")
         self.answers_label.setText("")
 
         rankings = msg.get("final_rankings", [])
+        self.lb_title.setText("Final Rankings")
+        self.lb_title.show()
         self._show_leaderboard(rankings[:10])
 
     def _show_leaderboard(self, scores: list[dict]):
-        # Clear old
+        # Clear old entries
         while self.lb_layout.count():
             item = self.lb_layout.takeAt(0)
             if item.widget():
@@ -305,7 +268,7 @@ class DisplayWindow(QWidget):
             name = s.get("name", "")
             score = s.get("total_score", 0)
             row.setText(f"  {medal}  {name}    —    {score:,} pts")
-            row.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold if i < 3 else QFont.Weight.Normal))
+            row.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold if i < 3 else QFont.Weight.Normal))
             color = "#fbbf24" if i == 0 else "#9ca3af" if i == 1 else "#d97706" if i == 2 else "#94a3b8"
             row.setStyleSheet(f"color: {color}; padding: 4px;")
             self.lb_layout.addWidget(row)
