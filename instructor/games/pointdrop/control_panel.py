@@ -1,15 +1,36 @@
 import json
+import os
+import sys
 import threading
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QMessageBox, QComboBox, QGroupBox, QTableWidget, QTableWidgetItem,
-    QHeaderView,
+    QHeaderView, QPlainTextEdit, QSplitter,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QProcess, QObject
 
 from instructor.api_client import ApiClient
 from instructor.games.pointdrop.display_window import DisplayWindow
+
+
+class LogStream(QObject):
+    """Redirect writes to a Qt signal so they appear in a QPlainTextEdit."""
+    text_written = pyqtSignal(str)
+
+    def __init__(self, original_stream=None):
+        super().__init__()
+        self._original = original_stream
+
+    def write(self, text: str):
+        if text.strip():
+            self.text_written.emit(text)
+        if self._original:
+            self._original.write(text)
+
+    def flush(self):
+        if self._original:
+            self._original.flush()
 
 try:
     import websockets
@@ -89,7 +110,9 @@ class PointDropControlPanel(QWidget):
         self.display_window: DisplayWindow | None = None
         self.current_session_id: int | None = None
         self._players: dict[int, str] = {}  # player_id -> name
+        self._server_process: QProcess | None = None
         self._build_ui()
+        self._setup_log_redirect()
         self._refresh_quizzes()
 
     def _build_ui(self):
@@ -187,7 +210,10 @@ class PointDropControlPanel(QWidget):
         display_row.addStretch()
         layout.addLayout(display_row)
 
-        # ── Leaderboard ───────────────────────────────────────────────────
+        # ── Bottom section: Leaderboard (left) + Consoles (right) ────────
+        bottom_splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        # Leaderboard
         lb_group = QGroupBox("Live Leaderboard")
         lb_layout = QVBoxLayout(lb_group)
         self.lb_table = QTableWidget()
@@ -196,7 +222,50 @@ class PointDropControlPanel(QWidget):
         self.lb_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.lb_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         lb_layout.addWidget(self.lb_table)
-        layout.addWidget(lb_group)
+        bottom_splitter.addWidget(lb_group)
+
+        # Console panel (right side)
+        console_widget = QWidget()
+        console_layout = QVBoxLayout(console_widget)
+        console_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Server console
+        srv_group = QGroupBox("Server Console")
+        srv_layout = QVBoxLayout(srv_group)
+        srv_btn_row = QHBoxLayout()
+        self.btn_server = QPushButton("Start Server")
+        self.btn_server.clicked.connect(self._toggle_server)
+        self.btn_server.setStyleSheet("font-weight: bold;")
+        srv_btn_row.addWidget(self.btn_server)
+        srv_btn_row.addStretch()
+        srv_layout.addLayout(srv_btn_row)
+        self.server_console = QPlainTextEdit()
+        self.server_console.setReadOnly(True)
+        self.server_console.setMaximumBlockCount(500)
+        self.server_console.setStyleSheet(
+            "font-family: Consolas, monospace; font-size: 11px; "
+            "background-color: #1a1a2e; color: #a5b4fc;"
+        )
+        srv_layout.addWidget(self.server_console)
+        console_layout.addWidget(srv_group)
+
+        # Instructor console
+        instr_group = QGroupBox("Instructor Console")
+        instr_layout = QVBoxLayout(instr_group)
+        self.instructor_console = QPlainTextEdit()
+        self.instructor_console.setReadOnly(True)
+        self.instructor_console.setMaximumBlockCount(500)
+        self.instructor_console.setStyleSheet(
+            "font-family: Consolas, monospace; font-size: 11px; "
+            "background-color: #1a1a2e; color: #6ee7b7;"
+        )
+        instr_layout.addWidget(self.instructor_console)
+        console_layout.addWidget(instr_group)
+
+        bottom_splitter.addWidget(console_widget)
+        bottom_splitter.setStretchFactor(0, 1)
+        bottom_splitter.setStretchFactor(1, 1)
+        layout.addWidget(bottom_splitter, stretch=1)
 
     def _refresh_quizzes(self):
         self.quiz_combo.clear()
@@ -404,7 +473,65 @@ class PointDropControlPanel(QWidget):
             self.lb_table.setItem(row, 1, QTableWidgetItem(name))
             self.lb_table.setItem(row, 2, QTableWidgetItem("0"))
 
+    # ── Log redirect ──────────────────────────────────────────────────────
+
+    def _setup_log_redirect(self):
+        self._log_stream = LogStream(sys.stdout)
+        self._log_stream.text_written.connect(self._append_instructor_log)
+        sys.stdout = self._log_stream
+
+    def _append_instructor_log(self, text: str):
+        self.instructor_console.appendPlainText(text.rstrip())
+
+    # ── Server process ────────────────────────────────────────────────────
+
+    def _toggle_server(self):
+        if self._server_process and self._server_process.state() != QProcess.ProcessState.NotRunning:
+            self._server_process.terminate()
+            self._server_process.waitForFinished(3000)
+            if self._server_process.state() != QProcess.ProcessState.NotRunning:
+                self._server_process.kill()
+            self.btn_server.setText("Start Server")
+            self.server_console.appendPlainText("--- Server stopped ---")
+        else:
+            self._start_server()
+
+    def _start_server(self):
+        self._server_process = QProcess(self)
+        self._server_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        self._server_process.readyReadStandardOutput.connect(self._read_server_output)
+        self._server_process.finished.connect(self._on_server_finished)
+
+        project_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        self._server_process.setWorkingDirectory(project_dir)
+
+        python = sys.executable
+        self._server_process.start(python, ["run_server.py"])
+        self.btn_server.setText("Stop Server")
+        self.server_console.appendPlainText("--- Starting server... ---")
+
+    def _read_server_output(self):
+        if self._server_process:
+            data = self._server_process.readAllStandardOutput()
+            text = bytes(data).decode("utf-8", errors="replace")
+            for line in text.splitlines():
+                if line.strip():
+                    self.server_console.appendPlainText(line)
+
+    def _on_server_finished(self, exit_code, exit_status):
+        self.server_console.appendPlainText(f"--- Server exited (code {exit_code}) ---")
+        self.btn_server.setText("Start Server")
+
     def closeEvent(self, event):
+        # Restore stdout
+        if hasattr(self, '_log_stream') and self._log_stream._original:
+            sys.stdout = self._log_stream._original
+        # Stop server process
+        if self._server_process and self._server_process.state() != QProcess.ProcessState.NotRunning:
+            self._server_process.terminate()
+            self._server_process.waitForFinished(3000)
+            if self._server_process.state() != QProcess.ProcessState.NotRunning:
+                self._server_process.kill()
         if self.ws_thread:
             self.ws_thread.stop()
             self.ws_thread.wait(2000)
