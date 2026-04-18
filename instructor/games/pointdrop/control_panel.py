@@ -88,6 +88,7 @@ class PointDropControlPanel(QWidget):
         self.ws_thread: WebSocketThread | None = None
         self.display_window: DisplayWindow | None = None
         self.current_session_id: int | None = None
+        self._players: dict[int, str] = {}  # player_id -> name
         self._build_ui()
         self._refresh_quizzes()
 
@@ -240,11 +241,19 @@ class PointDropControlPanel(QWidget):
 
         if msg_type == "player_joined":
             self.players_label.setText(f"Players: {msg.get('player_count', 0)}")
+            pid = msg.get("player_id")
+            name = msg.get("name", "")
+            if pid is not None:
+                self._players[pid] = name
+            self._update_leaderboard_from_players()
             if self.display_window:
                 self.display_window.on_player_joined(msg)
 
         elif msg_type == "player_left":
             self.players_label.setText(f"Players: {msg.get('player_count', 0)}")
+            pid = msg.get("player_id")
+            self._players.pop(pid, None)
+            self._update_leaderboard_from_players()
 
         elif msg_type == "game_start":
             self.status_label.setText("Status: Game started!")
@@ -292,7 +301,8 @@ class PointDropControlPanel(QWidget):
             self.btn_next.setEnabled(False)
             self.btn_reveal.setEnabled(False)
             self.btn_end.setEnabled(False)
-            self._update_leaderboard(msg.get("final_rankings", []))
+            self._players.clear()
+            self.lb_table.setRowCount(0)
             if self.display_window:
                 self.display_window.on_game_end(msg)
 
@@ -322,7 +332,10 @@ class PointDropControlPanel(QWidget):
             self.display_window = None
             self.btn_display.setText("Open Display Window")
         else:
-            self.display_window = DisplayWindow()
+            self.display_window = DisplayWindow(
+                session_id=self.current_session_id,
+                server_port=5000,
+            )
             self.display_window.show()
             self.btn_display.setText("Close Display Window")
 
@@ -334,6 +347,15 @@ class PointDropControlPanel(QWidget):
             self.lb_table.setItem(row, 1, QTableWidgetItem(s.get("name", "")))
             score = s.get("total_score", 0)
             self.lb_table.setItem(row, 2, QTableWidgetItem(str(score)))
+
+    def _update_leaderboard_from_players(self):
+        """Show all joined players with score 0, sorted by name."""
+        names = sorted(self._players.values(), key=str.lower)
+        self.lb_table.setRowCount(len(names))
+        for row, name in enumerate(names):
+            self.lb_table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
+            self.lb_table.setItem(row, 1, QTableWidgetItem(name))
+            self.lb_table.setItem(row, 2, QTableWidgetItem("0"))
 
     def closeEvent(self, event):
         if self.ws_thread:

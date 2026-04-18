@@ -96,14 +96,10 @@ function handleMessage(msg) {
 
         case 'player_joined':
             players[msg.player_id] = msg.name;
-            document.getElementById('player-count').textContent = `${msg.player_count} players joined`;
-            updatePlayerList();
             break;
 
         case 'player_left':
             delete players[msg.player_id];
-            document.getElementById('player-count').textContent = `${msg.player_count} players joined`;
-            updatePlayerList();
             break;
 
         case 'game_start':
@@ -143,16 +139,6 @@ function handleMessage(msg) {
             }
             break;
     }
-}
-
-// ── Waiting Screen ────────────────────────────────────────────────────────────
-
-function updatePlayerList() {
-    const names = Object.values(players);
-    const display = names.length > 8
-        ? names.slice(0, 8).join(', ') + `, +${names.length - 8} more`
-        : names.join(', ');
-    document.getElementById('player-list').textContent = display;
 }
 
 // ── Question Screen ───────────────────────────────────────────────────────────

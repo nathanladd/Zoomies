@@ -13,12 +13,18 @@ class DisplayWindow(QWidget):
     Answer choices are NOT shown here — students see them on their own devices.
     """
 
-    def __init__(self):
+    def __init__(self, session_id: int | None = None, server_port: int = 5000):
         super().__init__()
+        self.session_id = session_id
+        self.server_port = server_port
         self.setWindowTitle("PointDrop - Display (F11 = fullscreen)")
         self.setMinimumSize(1024, 700)
         self.setStyleSheet("background-color: #0f172a; color: white;")
 
+        self._is_waiting = False
+        self._join_url = ""
+        self._player_count = 0
+        self._player_names: list[str] = []
         self._build_ui()
         self._show_waiting()
 
@@ -95,6 +101,8 @@ class DisplayWindow(QWidget):
         self.answers_label = QLabel("")
         self.answers_label.setFont(QFont("Segoe UI", 16))
         self.answers_label.setStyleSheet("color: #94a3b8;")
+        self.answers_label.setTextFormat(Qt.TextFormat.RichText)
+        self.answers_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.timer_text = QLabel("")
         self.timer_text.setFont(QFont("Segoe UI", 36, QFont.Weight.Bold))
         self.timer_text.setStyleSheet("color: #fbbf24;")
@@ -133,25 +141,80 @@ class DisplayWindow(QWidget):
     # ── Screen states ──────────────────────────────────────────────────────
 
     def _show_waiting(self):
-        self.question_label.setText("POINTDROP")
-        self.question_label.setFont(QFont("Segoe UI", 52, QFont.Weight.Bold))
-        self.question_label.setStyleSheet("color: #818cf8; padding: 20px;")
+        self._is_waiting = True
+        self._player_count = 0
+        self._player_names = []
         self.progress_label.setText("")
         self.points_label.setText("")
         self.timer_bar.hide()
         self.timer_text.setText("")
-        self.answers_label.setText("Waiting for players...")
+        self.answers_label.setText("")
         self.image_label.hide()
         self.correct_label.hide()
         self.lb_title.hide()
         self.leaderboard_widget.hide()
 
+        # Resolve local IP for join URL
+        import socket
+        try:
+            hostname = socket.gethostname()
+            local_ip = socket.gethostbyname(hostname)
+        except Exception:
+            local_ip = "localhost"
+        self._join_url = f"http://{local_ip}:{self.server_port}"
+
+        self.question_label.setTextFormat(Qt.TextFormat.RichText)
+        self.question_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        self._update_waiting_display()
+
+    def _update_waiting_display(self):
+        session_text = f"Session:&nbsp;&nbsp;<b>{self.session_id}</b>" if self.session_id else ""
+        if self._player_count > 0:
+            players_text = f'{self._player_count} player{"s" if self._player_count != 1 else ""} joined'
+        else:
+            players_text = "Waiting for players..."
+        # Build player name list
+        names_html = ""
+        if self._player_names:
+            name_spans = "&nbsp;&nbsp;&bull;&nbsp;&nbsp;".join(
+                f'<span style="color:#e2e8f0;">{n}</span>' for n in self._player_names
+            )
+            names_html = (
+                f'<div style="font-size:20px; color:#94a3b8; margin-top:16px; '
+                f'line-height:1.6;">{name_spans}</div>'
+            )
+        self.question_label.setText(
+            f'<div style="text-align:center;">'
+            f'<div style="font-size:58px; font-weight:bold; color:#818cf8; margin-bottom:24px;">POINTDROP</div>'
+            f'<div style="font-size:20px; color:#94a3b8; margin-bottom:4px;">Join at</div>'
+            f'<div style="font-size:40px; font-weight:bold; color:#818cf8; margin-bottom:16px;">{self._join_url}</div>'
+            f'<div style="font-size:32px; font-weight:bold; color:#34d399; margin-bottom:16px;">{session_text}</div>'
+            f'<div style="font-size:22px; color:#94a3b8;">{players_text}</div>'
+            f'{names_html}'
+            f'</div>'
+        )
+
     # ── Event handlers called by the control panel ─────────────────────────
 
     def on_player_joined(self, msg: dict):
-        self.answers_label.setText(f"{msg.get('player_count', 0)} players joined")
+        self._player_count = msg.get('player_count', 0)
+        name = msg.get('name', '')
+        if name and name not in self._player_names:
+            self._player_names.append(name)
+        if self._is_waiting:
+            self._update_waiting_display()
+        else:
+            self.answers_label.setText(f"{self._player_count} players joined")
 
     def on_game_start(self, msg: dict):
+        self._is_waiting = False
+        self.question_label.setTextFormat(Qt.TextFormat.PlainText)
+        self.question_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        self.question_label.setMinimumHeight(120)
         self.question_label.setText("Get Ready!")
         self.question_label.setFont(QFont("Segoe UI", 40, QFont.Weight.Bold))
         self.question_label.setStyleSheet("color: #e2e8f0; padding: 20px;")
