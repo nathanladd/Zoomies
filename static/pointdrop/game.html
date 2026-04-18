@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PointDrop</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/static/pointdrop/css/styles.css?v=2">
+    <link rel="stylesheet" href="/static/pointdrop/css/styles.css?v=3">
 </head>
 <body class="bg-slate-900 text-white min-h-screen">
 
     <!-- WAITING SCREEN -->
-    <div id="screen-waiting" class="screen active flex items-center justify-center min-h-screen">
+    <div id="screen-waiting" class="screen active">
+        <div class="flex items-center justify-center min-h-screen">
         <div class="text-center space-y-6 p-8">
             <h1 class="text-5xl font-bold glow text-indigo-400">POINTDROP</h1>
             <div class="bg-slate-800/80 backdrop-blur rounded-2xl p-8 max-w-md mx-auto space-y-4 border border-slate-700">
@@ -19,6 +20,7 @@
                     <p class="text-lg">Waiting for quiz to start...</p>
                 </div>
             </div>
+        </div>
         </div>
     </div>
 
@@ -109,6 +111,6 @@
         </div>
     </div>
 
-    <script src="/static/pointdrop/js/game.js?v=2"></script>
+    <script src="/static/pointdrop/js/game.js?v=3"></script>
 </body>
 </html>

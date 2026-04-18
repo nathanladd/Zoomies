@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QProgressBar, QFrame, QSizePolicy, QSplitter,
 )
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QFont, QColor, QPalette, QKeyEvent, QPixmap
+from PyQt6.QtGui import QFont, QColor, QPalette, QKeyEvent, QPixmap, QMouseEvent
 
 
 class DisplayWindow(QWidget):
@@ -15,6 +15,7 @@ class DisplayWindow(QWidget):
 
     def __init__(self, session_id: int | None = None, server_port: int = 5000):
         super().__init__()
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.session_id = session_id
         self.server_port = server_port
         self.setWindowTitle("PointDrop - Display (F11 = fullscreen)")
@@ -25,8 +26,29 @@ class DisplayWindow(QWidget):
         self._join_url = ""
         self._player_count = 0
         self._player_names: list[str] = []
+        self._drag_pos = None
         self._build_ui()
         self._show_waiting()
+
+    # ── Frameless window dragging ──────────────────────────────────────────
+
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.MouseButton.LeftButton and not self.isFullScreen():
+            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if self._drag_pos is not None and event.buttons() & Qt.MouseButton.LeftButton:
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        self._drag_pos = None
+        super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event: QKeyEvent):
         """Toggle fullscreen with F11 or Escape to exit fullscreen."""
