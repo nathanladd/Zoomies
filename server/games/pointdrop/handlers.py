@@ -266,6 +266,13 @@ async def handle_instructor_ws(ws: WebSocket, session_id: int) -> None:
                         **q_info,
                     })
 
+                    # Send correct answer to instructor only
+                    correct = engine.current_question.correct_display if engine.current_question else ""
+                    await manager.send_to_instructor(session_id, {
+                        "type": "question_answer",
+                        "correct_answer": correct,
+                    })
+
                     # Start timer loop for points updates and eliminations
                     if timer_task and not timer_task.done():
                         timer_task.cancel()

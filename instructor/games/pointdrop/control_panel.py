@@ -166,6 +166,18 @@ class PointDropControlPanel(QWidget):
 
         layout.addWidget(controls_group)
 
+        # ── Current Question ──────────────────────────────────────────────
+        qa_group = QGroupBox("Current Question")
+        qa_layout = QVBoxLayout(qa_group)
+        self.qa_question_label = QLabel("")
+        self.qa_question_label.setWordWrap(True)
+        self.qa_question_label.setStyleSheet("font-size: 14px; font-weight: bold; padding: 4px;")
+        qa_layout.addWidget(self.qa_question_label)
+        self.qa_choices_layout = QVBoxLayout()
+        qa_layout.addLayout(self.qa_choices_layout)
+        self._qa_choice_labels: list[QLabel] = []
+        layout.addWidget(qa_group)
+
         # ── Display Window Button ──────────────────────────────────────────
         display_row = QHBoxLayout()
         self.btn_display = QPushButton("Open Display Window")
@@ -269,8 +281,12 @@ class PointDropControlPanel(QWidget):
             self.answers_label.setText(f"Answers: 0/?")
             self.btn_next.setEnabled(False)
             self.btn_reveal.setEnabled(True)
+            self._show_question(msg)
             if self.display_window:
                 self.display_window.on_question_start(msg)
+
+        elif msg_type == "question_answer":
+            self._highlight_correct(msg.get("correct_answer", ""))
 
         elif msg_type == "points_update":
             remaining = msg.get("time_remaining_ms", 0)
@@ -303,6 +319,7 @@ class PointDropControlPanel(QWidget):
             self.btn_end.setEnabled(False)
             self._players.clear()
             self.lb_table.setRowCount(0)
+            self._clear_question()
             if self.display_window:
                 self.display_window.on_game_end(msg)
 
@@ -347,6 +364,36 @@ class PointDropControlPanel(QWidget):
             self.lb_table.setItem(row, 1, QTableWidgetItem(s.get("name", "")))
             score = s.get("total_score", 0)
             self.lb_table.setItem(row, 2, QTableWidgetItem(str(score)))
+
+    def _show_question(self, msg: dict):
+        self.qa_question_label.setText(msg.get("text", ""))
+        # Clear old choice labels
+        for lbl in self._qa_choice_labels:
+            self.qa_choices_layout.removeWidget(lbl)
+            lbl.deleteLater()
+        self._qa_choice_labels.clear()
+        # Add new choice labels
+        for choice in msg.get("choices", []):
+            lbl = QLabel(f"  {choice}")
+            lbl.setStyleSheet("font-size: 13px; padding: 2px 8px; border-radius: 4px;")
+            self.qa_choices_layout.addWidget(lbl)
+            self._qa_choice_labels.append(lbl)
+
+    def _highlight_correct(self, correct: str):
+        for lbl in self._qa_choice_labels:
+            text = lbl.text().strip()
+            if text == correct:
+                lbl.setStyleSheet(
+                    "font-size: 13px; padding: 2px 8px; border-radius: 4px; "
+                    "background-color: #065f46; color: #34d399; font-weight: bold;"
+                )
+
+    def _clear_question(self):
+        self.qa_question_label.setText("")
+        for lbl in self._qa_choice_labels:
+            self.qa_choices_layout.removeWidget(lbl)
+            lbl.deleteLater()
+        self._qa_choice_labels.clear()
 
     def _update_leaderboard_from_players(self):
         """Show all joined players with score 0, sorted by name."""
