@@ -15,12 +15,13 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from server.config import BASE_DIR, DATA_DIR, DB_FILENAME, DB_PATH, MEDIA_DIR
+from server.config import (
+    BACKUPS_DIR, BASE_DIR, DATA_DIR, DB_FILENAME, DB_PATH, MEDIA_DIR,
+    USER_DATA_DIR,
+)
 from server.schemas import BackupResult, RestoreRequest
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-
-BACKUPS_DIR = BASE_DIR / "backups"
 
 
 def _online_sqlite_backup(src: Path, dst: Path) -> None:
@@ -103,10 +104,10 @@ async def restore_backup(body: RestoreRequest) -> dict[str, str]:
         shutil.move(str(MEDIA_DIR), str(safety_dir / "questions"))
     MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Extract
+    # Extract into the user-writable data root (holds data/ and media/questions/).
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
-            zf.extractall(BASE_DIR)
+            zf.extractall(USER_DATA_DIR)
     except zipfile.BadZipFile as e:
         # Roll back the safety move
         if (safety_dir / DB_FILENAME).exists():

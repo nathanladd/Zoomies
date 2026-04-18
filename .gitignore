@@ -10,11 +10,21 @@ venv/
 env/
 
 # Database
-data/cognit.db
+data/zundpunkt.db
+data/pre-restore-*/
 
 # Uploaded media (keep directory structure)
 media/questions/*
 !media/questions/.gitkeep
+
+# Backups
+backups/
+
+# PyInstaller / installer build artifacts
+dist/
+build/
+*.manifest
+*.spec.bak
 
 # IDE
 .vscode/

@@ -23,6 +23,35 @@ SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 5000
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+# Name must match AppMutex in installer/Zundpunkt.iss so Inno Setup can detect
+# a running instance during install/uninstall and offer to close it.
+SINGLETON_MUTEX_NAME = "ZundpunktSingletonMutex"
+_SINGLETON_MUTEX_HANDLE = None
+
+
+def _acquire_singleton_mutex() -> None:
+    """Create a Windows named mutex the installer can poll.
+
+    The handle is stashed on a module global so Python doesn't GC it — the OS
+    releases the mutex automatically when the process exits. Never blocks or
+    refuses startup; a pre-existing mutex just means the installer will see
+    "Zündpunkt is running" and prompt the user.
+    """
+    global _SINGLETON_MUTEX_HANDLE
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        CreateMutexW = ctypes.windll.kernel32.CreateMutexW
+        CreateMutexW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR]
+        CreateMutexW.restype = wintypes.HANDLE
+        _SINGLETON_MUTEX_HANDLE = CreateMutexW(None, False, SINGLETON_MUTEX_NAME)
+    except Exception:
+        # Non-fatal: losing the mutex just means the installer can't auto-close us.
+        _SINGLETON_MUTEX_HANDLE = None
+
 
 def _wait_for_server(host: str, port: int, timeout_s: float = 15.0) -> bool:
     """Poll the server's /api/topics endpoint until it responds 2xx or we time out."""
@@ -67,8 +96,16 @@ class MainWindow(QMainWindow):
         kill_port_processes(SERVER_PORT)  # clean up zombies from any previous run
         self.server_process = QProcess(self)
         self.server_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
-        self.server_process.setWorkingDirectory(str(PROJECT_ROOT))
-        self.server_process.start(sys.executable, ["run_server.py"])
+        if getattr(sys, "frozen", False):
+            # In a frozen build the installer ships a sibling Zundpunkt-Server.exe
+            # (console subsystem) next to Zundpunkt.exe — see the PyInstaller spec.
+            install_dir = Path(sys.executable).parent
+            server_exe = install_dir / "Zundpunkt-Server.exe"
+            self.server_process.setWorkingDirectory(str(install_dir))
+            self.server_process.start(str(server_exe), [])
+        else:
+            self.server_process.setWorkingDirectory(str(PROJECT_ROOT))
+            self.server_process.start(sys.executable, ["run_server.py"])
         self.server_process.waitForStarted(3000)
 
     def _stop_server(self):
@@ -201,6 +238,10 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    # Claim the named mutex before anything heavy so a parallel installer run
+    # can see "Zündpunkt is running" as soon as possible.
+    _acquire_singleton_mutex()
+
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
 

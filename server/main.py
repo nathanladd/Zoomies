@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from server.config import BASE_DIR, MEDIA_DIR
+from server.config import BASE_DIR, MEDIA_DIR, USER_DATA_DIR
 from server.database import init_db, get_db
 from server.routers import topics, questions, quizzes, sessions, admin
 from server.game.handlers import (
@@ -13,10 +13,12 @@ from server.game.handlers import (
 )
 from version import __version__
 
-# Ensure directories exist before mounting
-(BASE_DIR / "static" / "game" / "css").mkdir(parents=True, exist_ok=True)
-(BASE_DIR / "static" / "game" / "js").mkdir(parents=True, exist_ok=True)
-(BASE_DIR / "media" / "questions").mkdir(parents=True, exist_ok=True)
+# Config ensures user-writable data/media/backup dirs exist.
+# Static assets live in BASE_DIR (bundled read-only in frozen mode), so only
+# create the tree in dev where BASE_DIR is the project root.
+if not getattr(__import__("sys"), "frozen", False):
+    (BASE_DIR / "static" / "game" / "css").mkdir(parents=True, exist_ok=True)
+    (BASE_DIR / "static" / "game" / "js").mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
@@ -27,9 +29,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Zündpunkt", version=__version__, lifespan=lifespan)
 
-# Mount static files
+# Static web UI is bundled read-only (BASE_DIR = _MEIPASS in frozen mode;
+# project root in dev). Uploaded media lives under USER_DATA_DIR/media which
+# is user-writable. MEDIA_DIR (USER_DATA_DIR/media/questions) is already
+# ensured to exist by server.config.
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
-app.mount("/media", StaticFiles(directory=str(BASE_DIR / "media")), name="media")
+app.mount("/media", StaticFiles(directory=str(USER_DATA_DIR / "media")), name="media")
 
 # Register API routers
 app.include_router(topics.router)
