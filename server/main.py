@@ -11,6 +11,7 @@ from server.routers import topics, questions, quizzes, sessions, admin
 from server.game.handlers import (
     create_game, handle_student_ws, handle_instructor_ws,
 )
+from version import __version__
 
 # Ensure directories exist before mounting
 (BASE_DIR / "static" / "game" / "css").mkdir(parents=True, exist_ok=True)
@@ -24,7 +25,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Zündpunkt", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="Zündpunkt", version=__version__, lifespan=lifespan)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
@@ -36,6 +37,13 @@ app.include_router(questions.router)
 app.include_router(quizzes.router)
 app.include_router(sessions.router)
 app.include_router(admin.router)
+
+
+# ── Meta ──────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/version")
+async def api_version():
+    return {"version": __version__}
 
 
 # ── HTML page routes ───────────────────────────────────────────────────────────

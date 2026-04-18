@@ -39,7 +39,14 @@
         </div>
     </div>
 
+    <div id="version-badge"
+        class="fixed bottom-2 left-2 text-xs text-slate-600 select-none pointer-events-none"></div>
+
     <script>
+        fetch('/api/version').then(r => r.json()).then(d => {
+            document.getElementById('version-badge').textContent = 'v' + d.version;
+        }).catch(() => {});
+
         const nameInput = document.getElementById('player-name');
         const sessionInput = document.getElementById('session-id');
         const errorMsg = document.getElementById('error-msg');

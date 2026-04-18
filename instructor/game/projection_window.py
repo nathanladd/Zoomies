@@ -5,6 +5,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QFont, QColor, QPalette, QKeyEvent, QPixmap, QMouseEvent
 
+from version import __version__
+
 
 class ProjectionWindow(QWidget):
     """Fullscreen projection display for Zündpunkt games.
@@ -18,7 +20,7 @@ class ProjectionWindow(QWidget):
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.session_id = session_id
         self.server_port = server_port
-        self.setWindowTitle("Zündpunkt — Projection")
+        self.setWindowTitle(f"Zündpunkt v{__version__} — Projection")
         self.setMinimumSize(1024, 700)
         self.setStyleSheet("background-color: #0f172a; color: white;")
 
@@ -29,6 +31,7 @@ class ProjectionWindow(QWidget):
         self._drag_pos = None
         self._build_ui()
         self._build_fullscreen_hint()
+        self._build_version_label()
         self._show_waiting()
         self._place_hint()
 
@@ -96,6 +99,25 @@ class ProjectionWindow(QWidget):
         self.fullscreen_hint.move(max(0, x), max(0, y))
         self.fullscreen_hint.setVisible(not self.isFullScreen())
         self.fullscreen_hint.raise_()
+        self._place_version_label()
+
+    # ── Version label overlay ─────────────────────────────────────
+
+    def _build_version_label(self):
+        self.version_label = QLabel(f"v{__version__}", self)
+        self.version_label.setStyleSheet(
+            "color: #475569; background: transparent; font-size: 11px;"
+        )
+        self.version_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.version_label.adjustSize()
+
+    def _place_version_label(self):
+        if not hasattr(self, "version_label"):
+            return
+        margin = 10
+        self.version_label.adjustSize()
+        self.version_label.move(margin, self.height() - self.version_label.height() - margin)
+        self.version_label.raise_()
 
     def _build_ui(self):
         self.main_layout = QVBoxLayout(self)

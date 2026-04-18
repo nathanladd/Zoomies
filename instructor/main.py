@@ -17,6 +17,7 @@ from instructor.core.topic_manager import TopicManager
 from instructor.core.question_pool import QuestionPool
 from instructor.core.quiz_builder import QuizBuilder
 from instructor.game.control_panel import GameControlPanel, kill_port_processes
+from version import __version__
 
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 5000
@@ -41,7 +42,7 @@ def _wait_for_server(host: str, port: int, timeout_s: float = 15.0) -> bool:
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Zündpunkt")
+        self.setWindowTitle(f"Zündpunkt v{__version__}")
         self.setMinimumSize(1000, 700)
 
         # Start the backend server BEFORE building tabs (they hit the API on init).
