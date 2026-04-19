@@ -7,3 +7,29 @@ INFO:     Application startup complete.
 INFO:     127.0.0.1:49690 - "WebSocket /ws/instructor/1" [accepted]
 INFO:     connection open
 INFO:     connection closed
+INFO:     127.0.0.1:56178 - "WebSocket /ws/instructor/2" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:56391 - "WebSocket /ws/instructor/3" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:59335 - "WebSocket /ws/instructor/4" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:58678 - "WebSocket /ws/student/4" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:49704 - "WebSocket /ws/instructor/5" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:50348 - "WebSocket /ws/instructor/6" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:50368 - "WebSocket /ws/instructor/7" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:60885 - "WebSocket /ws/instructor/8" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:50656 - "WebSocket /ws/instructor/9" [accepted]
+INFO:     connection open
+INFO:     connection closed

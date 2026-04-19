@@ -73,6 +73,18 @@ class ProjectionWindow(QWidget):
         super().resizeEvent(event)
         self._place_hint()
 
+    def closeEvent(self, event):
+        """Hide instead of destroying.
+
+        The control panel keeps this window alive for the whole session so
+        its state (leaderboard, current question, timer, etc.) stays in sync
+        with game play regardless of visibility. When the instructor "closes"
+        it, we just hide; the window can be re-shown later and will already
+        be up to date.
+        """
+        event.ignore()
+        self.hide()
+
     def showEvent(self, event):
         super().showEvent(event)
         self._place_hint()
@@ -289,6 +301,19 @@ class ProjectionWindow(QWidget):
             f'{names_html}'
             f'</div>'
         )
+
+    def reset_for_new_game(self, game_id: int | None) -> None:
+        """Refresh this projection window to advertise a new game.
+
+        Called when the instructor starts a new game while this window is
+        already open — we don't want to destroy/recreate the window (that
+        loses fullscreen state and flashes a new window on the projector),
+        we just snap back to the waiting screen with the new game number.
+        """
+        self.game_id = game_id
+        self.question_label.setFont(QFont("Segoe UI", 30, QFont.Weight.Bold))
+        self.question_label.setStyleSheet("color: #e2e8f0; padding: 24px;")
+        self._show_waiting()
 
     # ── Event handlers called by the control panel ─────────────────────────
 

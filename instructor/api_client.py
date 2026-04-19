@@ -111,6 +111,9 @@ class ApiClient:
     def init_game(self, game_id: int) -> dict[str, Any]:
         return self.client.post(f"/api/games/{game_id}/init").json()
 
+    def end_game(self, game_id: int) -> dict[str, Any]:
+        return self.client.put(f"/api/games/{game_id}/end").json()
+
     def get_game(self, game_id: int) -> dict[str, Any]:
         return self.client.get(f"/api/games/{game_id}").json()
 

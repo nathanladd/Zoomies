@@ -322,14 +322,74 @@ class GameControlPanel(QWidget):
             QMessageBox.warning(self, "Error", "Select a quiz first.")
             return
 
+        # End any in-progress game before spinning up the new one. This keeps
+        # the server-side engine/DB state tidy and frees the WS slot.
+        self._stop_current_game()
+        self._reset_ui_for_new_game()
+
         try:
             game = self.api.create_game(quiz_id)
             self.current_game_id = game["id"]
             self.api.init_game(self.current_game_id)
             self.game_label.setText(f"Game #{self.current_game_id} (waiting)")
-            self._connect_ws()
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to create game: {e}")
+            return
+
+        # Make sure the projector is showing the new game number. The window
+        # is a persistent singleton — we reuse it (keeping fullscreen /
+        # position) if it exists, lazily create it otherwise, and always
+        # ensure it's visible at the start of a new game.
+        if self.projection_window is None:
+            self.projection_window = ProjectionWindow(
+                game_id=self.current_game_id,
+                server_port=5000,
+            )
+        else:
+            self.projection_window.reset_for_new_game(self.current_game_id)
+        self.projection_window.show()
+        self.btn_projection.setText("Close Projection")
+
+        self._connect_ws()
+
+    def _stop_current_game(self) -> None:
+        """Cleanly terminate whatever game is currently running (if any)."""
+        # Disconnect the existing WS thread first so its disconnected signal
+        # doesn't race with the new game's connected signal.
+        if self.ws_thread is not None:
+            try:
+                if self.ws_thread.isRunning():
+                    # Ask the server to finish cleanly; the handler updates DB
+                    # status and evicts the engine from active_games.
+                    self.ws_thread.send({"type": "end_game"})
+                self.ws_thread.stop()
+                self.ws_thread.wait(1000)
+            except Exception:
+                pass
+            self.ws_thread = None
+
+        # REST fallback: even if the WS never flushed end_game, the DB row for
+        # the old game should be marked finished. Ignored if already finished.
+        if self.current_game_id is not None:
+            try:
+                self.api.end_game(self.current_game_id)
+            except Exception:
+                pass
+
+    def _reset_ui_for_new_game(self) -> None:
+        """Clear labels, leaderboard, question area, and button states."""
+        self._players.clear()
+        self.lb_table.setRowCount(0)
+        self._clear_question()
+        self.q_label.setText("Question: -")
+        self.players_label.setText("Players: 0")
+        self.answers_label.setText("Answers: 0/0")
+        self.time_label.setText("Time: -")
+        self.status_label.setText("Status: Connecting...")
+        self.btn_start.setEnabled(False)
+        self.btn_next.setEnabled(False)
+        self.btn_reveal.setEnabled(False)
+        self.btn_end.setEnabled(False)
 
     def _connect_ws(self):
         if not HAS_WEBSOCKETS:
@@ -454,15 +514,19 @@ class GameControlPanel(QWidget):
             self.ws_thread.send({"type": "end_game"})
 
     def _toggle_projection(self):
-        if self.projection_window and self.projection_window.isVisible():
-            self.projection_window.close()
-            self.projection_window = None
-            self.btn_projection.setText("Open Projection")
-        else:
+        # The projection window is a long-lived singleton: all WS-driven
+        # updates keep flowing into it regardless of visibility, so toggling
+        # is just a show/hide. On first toggle it's lazily created.
+        if self.projection_window is None:
             self.projection_window = ProjectionWindow(
                 game_id=self.current_game_id,
                 server_port=5000,
             )
+
+        if self.projection_window.isVisible():
+            self.projection_window.hide()
+            self.btn_projection.setText("Open Projection")
+        else:
             self.projection_window.show()
             self.btn_projection.setText("Close Projection")
 

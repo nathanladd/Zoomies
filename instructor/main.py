@@ -167,6 +167,21 @@ class MainWindow(QMainWindow):
     def _build_menu(self):
         menubar = self.menuBar()
 
+        # File menu — game lifecycle + app exit
+        file_menu = menubar.addMenu("&File")
+
+        new_game_action = QAction("&New Game", self)
+        new_game_action.setShortcut("Ctrl+N")
+        new_game_action.triggered.connect(self.game_panel._create_game)
+        file_menu.addAction(new_game_action)
+
+        file_menu.addSeparator()
+
+        quit_action = QAction("&Quit", self)
+        quit_action.setShortcut("Ctrl+Q")
+        quit_action.triggered.connect(self.close)
+        file_menu.addAction(quit_action)
+
         # View menu — dock visibility toggles
         view_menu = menubar.addMenu("&View")
         for dock in (self.dock_topics, self.dock_questions, self.dock_quizzes):
