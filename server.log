@@ -120,3 +120,36 @@ INFO:     127.0.0.1:60877 - "POST /api/games/8/init HTTP/1.1" 200 OK
 INFO:     127.0.0.1:50650 - "PUT /api/games/8/end HTTP/1.1" 200 OK
 INFO:     127.0.0.1:50650 - "POST /api/games HTTP/1.1" 201 Created
 INFO:     127.0.0.1:50650 - "POST /api/games/9/init HTTP/1.1" 200 OK
+[WS-INSTR] Connection attempt for game 9
+[WS-INSTR] Connected for game 9
+[WS-INSTR] Received: start_game
+[WS-INSTR] Broadcasting game_start to 0 students
+[WS-INSTR] Received: next_question
+[WS-INSTR] next_question result: Q0
+[WS-INSTR] Broadcasting question_start to 0 students, choices=['A) True', 'B) False']
+[WS-INSTR] Instructor disconnected from game 9
+INFO:     127.0.0.1:65367 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65375 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65375 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65375 - "GET /api/questions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65375 - "GET /api/quizzes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65375 - "GET /api/quizzes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65375 - "POST /api/games HTTP/1.1" 201 Created
+INFO:     127.0.0.1:65375 - "POST /api/games/10/init HTTP/1.1" 200 OK
+[WS-INSTR] Connection attempt for game 10
+[WS-INSTR] Connected for game 10
+[WS-INSTR] Instructor disconnected from game 10
+INFO:     127.0.0.1:62059 - "PUT /api/games/10/end HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62059 - "POST /api/games HTTP/1.1" 201 Created
+INFO:     127.0.0.1:62059 - "POST /api/games/11/init HTTP/1.1" 200 OK
+[WS-INSTR] Connection attempt for game 11
+[WS-INSTR] Connected for game 11
+[WS-INSTR] Received: start_game
+[WS-INSTR] Broadcasting game_start to 0 students
+[WS-INSTR] Received: next_question
+[WS-INSTR] next_question result: Q0
+[WS-INSTR] Broadcasting question_start to 0 students, choices=['A) True', 'B) False']
+[WS-INSTR] Instructor disconnected from game 11
+INFO:     127.0.0.1:52420 - "PUT /api/games/11/end HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52420 - "POST /api/games HTTP/1.1" 201 Created
+INFO:     127.0.0.1:52420 - "POST /api/games/12/init HTTP/1.1" 200 OK
