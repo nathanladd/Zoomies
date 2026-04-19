@@ -247,6 +247,19 @@ class MainWindow(QMainWindow):
         )
 
     def closeEvent(self, event):
+        # ProjectionWindow is a parentless top-level window, so closing the
+        # main window doesn't cascade to it. Close it explicitly.
+        proj = getattr(self.game_panel, "projection_window", None)
+        if proj is not None:
+            proj.close()
+            self.game_panel.projection_window = None
+        # Tear down the WS thread the game panel owns before the server dies.
+        if getattr(self.game_panel, "ws_thread", None) is not None:
+            try:
+                self.game_panel.ws_thread.stop()
+                self.game_panel.ws_thread.wait(1000)
+            except Exception:
+                pass
         self.api.close()
         self._stop_server()
         event.accept()
