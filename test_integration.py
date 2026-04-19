@@ -94,28 +94,28 @@ def main():
 
     c.post(f"/api/quizzes/{qz['id']}/questions", json={"question_id": q2["id"]})
 
-    # ── Sessions ───────────────────────────────────────────────────────────
-    print("\n=== Sessions ===")
-    sess = c.post("/api/sessions", json={"quiz_id": qz["id"]}).json()
-    check("Create session", sess.get("id") and sess["status"] == "waiting")
+    # ── Games ─────────────────────────────────────────────────────────────────────
+    print("\n=== Games ===")
+    game = c.post("/api/games", json={"quiz_id": qz["id"]}).json()
+    check("Create game", game.get("id") and game["status"] == "waiting")
 
-    sess_detail = c.get(f"/api/sessions/{sess['id']}").json()
-    check("Get session", sess_detail["quiz_name"] == "Physics Unit Test")
+    game_detail = c.get(f"/api/games/{game['id']}").json()
+    check("Get game", game_detail["quiz_name"] == "Physics Unit Test")
 
-    sessions_list = c.get("/api/sessions").json()
-    check("List sessions", len(sessions_list) >= 1)
+    games_list = c.get("/api/games").json()
+    check("List games", len(games_list) >= 1)
 
-    # ── Game Init ──────────────────────────────────────────────────────────
-    print("\n=== Game Init ===")
-    init = c.post(f"/api/sessions/{sess['id']}/init-game").json()
+    # ── Engine Init ──────────────────────────────────────────────────────────────
+    print("\n=== Engine Init ===")
+    init = c.post(f"/api/games/{game['id']}/init").json()
     check("Init game engine", init.get("status") == "ok" and init["question_count"] == 3)
 
-    # ── Start/End session via REST ─────────────────────────────────────────
-    started = c.put(f"/api/sessions/{sess['id']}/start").json()
-    check("Start session", started["status"] == "active" and started["started_at"] is not None)
+    # ── Start/End game via REST ───────────────────────────────────────────────────
+    started = c.put(f"/api/games/{game['id']}/start").json()
+    check("Start game", started["status"] == "active" and started["started_at"] is not None)
 
-    ended = c.put(f"/api/sessions/{sess['id']}/end").json()
-    check("End session", ended["status"] == "finished" and ended["ended_at"] is not None)
+    ended = c.put(f"/api/games/{game['id']}/end").json()
+    check("End game", ended["status"] == "finished" and ended["ended_at"] is not None)
 
     # ── Admin backup ────────────────────────────────────────────────────
     print("\n=== Admin ===")
@@ -124,8 +124,8 @@ def main():
 
     # ── Cleanup test: delete ─────────────────────────────────────────────
     print("\n=== Cleanup ===")
-    r = c.delete(f"/api/sessions/{sess['id']}")
-    check("Delete session", r.status_code == 204)
+    r = c.delete(f"/api/games/{game['id']}")
+    check("Delete game", r.status_code == 204)
 
     r = c.delete(f"/api/quizzes/{qz['id']}")
     check("Delete quiz", r.status_code == 204)

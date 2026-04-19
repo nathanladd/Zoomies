@@ -15,10 +15,10 @@ class ProjectionWindow(QWidget):
     Answer choices are NOT shown here — students see them on their own devices.
     """
 
-    def __init__(self, session_id: int | None = None, server_port: int = 5000):
+    def __init__(self, game_id: int | None = None, server_port: int = 5000):
         super().__init__()
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
-        self.session_id = session_id
+        self.game_id = game_id
         self.server_port = server_port
         self.setWindowTitle(f"Zündpunkt v{__version__} — Projection")
         self.setMinimumSize(1024, 700)
@@ -249,7 +249,7 @@ class ProjectionWindow(QWidget):
         self._update_waiting_display()
 
     def _update_waiting_display(self):
-        session_text = f"Session:&nbsp;&nbsp;<b>{self.session_id}</b>" if self.session_id else ""
+        game_text = f"Game Number:&nbsp;&nbsp;<b>{self.game_id}</b>" if self.game_id else ""
         if self._player_count > 0:
             players_text = f'{self._player_count} player{"s" if self._player_count != 1 else ""} joined'
         else:
@@ -284,7 +284,7 @@ class ProjectionWindow(QWidget):
             f'</div>'
             f'<div style="font-size:20px; color:#94a3b8; margin-bottom:4px;">Join at</div>'
             f'<div style="font-size:40px; font-weight:bold; color:#818cf8; margin-bottom:16px;">{self._join_url}</div>'
-            f'<div style="font-size:32px; font-weight:bold; color:#34d399; margin-bottom:16px;">{session_text}</div>'
+            f'<div style="font-size:32px; font-weight:bold; color:#34d399; margin-bottom:16px;">{game_text}</div>'
             f'<div style="font-size:22px; color:#94a3b8;">{players_text}</div>'
             f'{names_html}'
             f'</div>'

@@ -80,9 +80,9 @@ class WebSocketThread(QThread):
     connected = pyqtSignal()
     disconnected = pyqtSignal()
 
-    def __init__(self, session_id: int, host: str = "localhost", port: int = 5000):
+    def __init__(self, game_id: int, host: str = "localhost", port: int = 5000):
         super().__init__()
-        self.session_id = session_id
+        self.game_id = game_id
         self.host = host
         self.port = port
         self._running = False
@@ -96,7 +96,7 @@ class WebSocketThread(QThread):
         self._loop.run_until_complete(self._connect())
 
     async def _connect(self):
-        uri = f"ws://{self.host}:{self.port}/ws/instructor/{self.session_id}"
+        uri = f"ws://{self.host}:{self.port}/ws/instructor/{self.game_id}"
         print(f"[INSTR-WS] Connecting to {uri}")
         try:
             async with websockets.connect(uri) as ws:
@@ -123,6 +123,9 @@ class WebSocketThread(QThread):
                         self.message_received.emit(data)
                     except asyncio.TimeoutError:
                         continue
+                    except websockets.ConnectionClosed as e:
+                        print(f"[INSTR-WS] Connection closed (code={e.code})")
+                        break
                     except Exception as e:
                         print(f"[INSTR-WS] recv error: {e}")
                         break
@@ -146,7 +149,7 @@ class GameControlPanel(QWidget):
         self.api = api
         self.ws_thread: WebSocketThread | None = None
         self.projection_window: ProjectionWindow | None = None
-        self.current_session_id: int | None = None
+        self.current_game_id: int | None = None
         self._players: dict[int, str] = {}  # player_id -> name
         self._server_process = server_process  # owned by MainWindow
         # Spinner state for collapsing points_update log lines
@@ -178,13 +181,21 @@ class GameControlPanel(QWidget):
         row1.addStretch()
         setup_layout.addLayout(row1)
 
+        # New Game + Open Projection live on the same row; the projection
+        # toggle sits immediately to the right of New Game so instructors can
+        # start a game and throw it onto the projector without mousing across
+        # the panel.
         row2 = QHBoxLayout()
-        self.btn_create_session = QPushButton("Create Session")
-        self.btn_create_session.clicked.connect(self._create_session)
-        self.session_label = QLabel("No active session")
-        self.session_label.setStyleSheet("font-weight: bold;")
-        row2.addWidget(self.btn_create_session)
-        row2.addWidget(self.session_label)
+        self.btn_create_game = QPushButton("New Game")
+        self.btn_create_game.clicked.connect(self._create_game)
+        self.btn_projection = QPushButton("Open Projection")
+        self.btn_projection.clicked.connect(self._toggle_projection)
+        self.btn_projection.setEnabled(False)
+        self.game_label = QLabel("No active game")
+        self.game_label.setStyleSheet("font-weight: bold;")
+        row2.addWidget(self.btn_create_game)
+        row2.addWidget(self.btn_projection)
+        row2.addWidget(self.game_label)
         row2.addStretch()
         setup_layout.addLayout(row2)
 
@@ -246,15 +257,6 @@ class GameControlPanel(QWidget):
         self._qa_choice_labels: list[QLabel] = []
         layout.addWidget(qa_group)
 
-        # ── Projection Window Button ───────────────────────────────────────
-        projection_row = QHBoxLayout()
-        self.btn_projection = QPushButton("Open Projection")
-        self.btn_projection.clicked.connect(self._toggle_projection)
-        self.btn_projection.setEnabled(False)
-        projection_row.addWidget(self.btn_projection)
-        projection_row.addStretch()
-        layout.addLayout(projection_row)
-
         # ── Bottom section: Leaderboard (left) + Consoles (right) ────────
         bottom_splitter = QSplitter(Qt.Orientation.Horizontal)
 
@@ -314,29 +316,29 @@ class GameControlPanel(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to load quizzes: {e}")
 
-    def _create_session(self):
+    def _create_game(self):
         quiz_id = self.quiz_combo.currentData()
         if quiz_id is None:
             QMessageBox.warning(self, "Error", "Select a quiz first.")
             return
 
         try:
-            session = self.api.create_session(quiz_id)
-            self.current_session_id = session["id"]
-            self.api.init_game(self.current_session_id)
-            self.session_label.setText(f"Session #{self.current_session_id} (waiting)")
+            game = self.api.create_game(quiz_id)
+            self.current_game_id = game["id"]
+            self.api.init_game(self.current_game_id)
+            self.game_label.setText(f"Game #{self.current_game_id} (waiting)")
             self._connect_ws()
         except Exception as e:
-            QMessageBox.warning(self, "Error", f"Failed to create session: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to create game: {e}")
 
     def _connect_ws(self):
         if not HAS_WEBSOCKETS:
             QMessageBox.warning(self, "Error", "websockets package not installed")
             return
-        if self.current_session_id is None:
+        if self.current_game_id is None:
             return
 
-        self.ws_thread = WebSocketThread(self.current_session_id)
+        self.ws_thread = WebSocketThread(self.current_game_id)
         self.ws_thread.message_received.connect(self._on_ws_message)
         self.ws_thread.connected.connect(self._on_ws_connected)
         self.ws_thread.disconnected.connect(self._on_ws_disconnected)
@@ -458,7 +460,7 @@ class GameControlPanel(QWidget):
             self.btn_projection.setText("Open Projection")
         else:
             self.projection_window = ProjectionWindow(
-                session_id=self.current_session_id,
+                game_id=self.current_game_id,
                 server_port=5000,
             )
             self.projection_window.show()

@@ -1,7 +1,7 @@
 // ── State ──────────────────────────────────────────────────────────────────────
 
 const params = new URLSearchParams(window.location.search);
-const SESSION_ID = params.get('session');
+const GAME_ID = params.get('game');
 const PLAYER_NAME = params.get('name');
 
 let ws = null;
@@ -26,7 +26,7 @@ function showScreen(id) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
-if (!SESSION_ID || !PLAYER_NAME) {
+if (!GAME_ID || !PLAYER_NAME) {
     window.location.href = '/';
 } else {
     document.getElementById('player-name-display').textContent = PLAYER_NAME;
@@ -36,7 +36,7 @@ if (!SESSION_ID || !PLAYER_NAME) {
 
 function connect() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${protocol}//${window.location.host}/ws/student/${SESSION_ID}`);
+    ws = new WebSocket(`${protocol}//${window.location.host}/ws/student/${GAME_ID}`);
 
     ws.onopen = () => {
         reconnectAttempts = 0;

@@ -103,12 +103,12 @@ class QuizDetailRead(QuizRead):
     questions: list[QuizQuestionRead] = []
 
 
-# ── GameSession ────────────────────────────────────────────────────────────────
+# ── Game ─────────────────────────────────────────────────────────────────────────────────
 
-class GameSessionCreate(BaseModel):
+class GameCreate(BaseModel):
     quiz_id: int
 
-class GameSessionRead(BaseModel):
+class GameRead(BaseModel):
     id: int
     quiz_id: int
     status: str
@@ -124,7 +124,7 @@ class GameSessionRead(BaseModel):
 
 class PlayerRead(BaseModel):
     id: int
-    session_id: int
+    game_id: int
     name: str
     total_score: int
     joined_at: datetime

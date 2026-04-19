@@ -55,7 +55,7 @@ class Quiz(Base):
         back_populates="quiz", lazy="selectin", order_by="QuizQuestion.position",
         cascade="all, delete-orphan",
     )
-    sessions: Mapped[list["GameSession"]] = relationship(back_populates="quiz", lazy="selectin")
+    games: Mapped[list["Game"]] = relationship(back_populates="quiz", lazy="selectin")
 
 
 class QuizQuestion(Base):
@@ -70,8 +70,8 @@ class QuizQuestion(Base):
     question: Mapped[Question] = relationship(back_populates="quiz_links", lazy="selectin")
 
 
-class GameSession(Base):
-    __tablename__ = "game_sessions"
+class Game(Base):
+    __tablename__ = "games"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     quiz_id: Mapped[int] = mapped_column(Integer, ForeignKey("quizzes.id"), nullable=False)
@@ -79,17 +79,17 @@ class GameSession(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    quiz: Mapped[Quiz] = relationship(back_populates="sessions", lazy="selectin")
-    players: Mapped[list["Player"]] = relationship(back_populates="session", lazy="selectin", cascade="all, delete-orphan")
+    quiz: Mapped[Quiz] = relationship(back_populates="games", lazy="selectin")
+    players: Mapped[list["Player"]] = relationship(back_populates="game", lazy="selectin", cascade="all, delete-orphan")
 
 
 class Player(Base):
     __tablename__ = "players"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[int] = mapped_column(Integer, ForeignKey("game_sessions.id", ondelete="CASCADE"), nullable=False)
+    game_id: Mapped[int] = mapped_column(Integer, ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
     total_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
-    session: Mapped[GameSession] = relationship(back_populates="players", lazy="selectin")
+    game: Mapped[Game] = relationship(back_populates="players", lazy="selectin")

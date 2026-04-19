@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.config import BASE_DIR, MEDIA_DIR, USER_DATA_DIR
 from server.database import init_db, get_db
-from server.routers import topics, questions, quizzes, sessions, admin
+from server.routers import topics, questions, quizzes, games, admin
 from server.game.handlers import (
-    create_game, handle_student_ws, handle_instructor_ws,
+    load_engine, handle_student_ws, handle_instructor_ws,
 )
 from version import __version__
 
@@ -40,7 +40,7 @@ app.mount("/media", StaticFiles(directory=str(USER_DATA_DIR / "media")), name="m
 app.include_router(topics.router)
 app.include_router(questions.router)
 app.include_router(quizzes.router)
-app.include_router(sessions.router)
+app.include_router(games.router)
 app.include_router(admin.router)
 
 
@@ -69,22 +69,22 @@ async def play_game():
     )
 
 
-# ── WebSocket endpoints ───────────────────────────────────────────────────────
+# ── Engine bootstrap + WebSocket endpoints ──────────────────────────────────────────────
 
-@app.post("/api/sessions/{session_id}/init-game")
-async def init_game(session_id: int, db: AsyncSession = Depends(get_db)):
+@app.post("/api/games/{game_id}/init")
+async def init_game_engine(game_id: int, db: AsyncSession = Depends(get_db)):
     try:
-        engine = await create_game(session_id, db)
+        engine = await load_engine(game_id, db)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return {"status": "ok", "session_id": session_id, "question_count": engine.question_count}
+    return {"status": "ok", "game_id": game_id, "question_count": engine.question_count}
 
 
-@app.websocket("/ws/student/{session_id}")
-async def ws_student(websocket: WebSocket, session_id: int):
-    await handle_student_ws(websocket, session_id)
+@app.websocket("/ws/student/{game_id}")
+async def ws_student(websocket: WebSocket, game_id: int):
+    await handle_student_ws(websocket, game_id)
 
 
-@app.websocket("/ws/instructor/{session_id}")
-async def ws_instructor(websocket: WebSocket, session_id: int):
-    await handle_instructor_ws(websocket, session_id)
+@app.websocket("/ws/instructor/{game_id}")
+async def ws_instructor(websocket: WebSocket, game_id: int):
+    await handle_instructor_ws(websocket, game_id)

@@ -5,7 +5,7 @@ import websockets
 
 
 async def test():
-    # First create a session + init game via REST
+    # First create a game + init engine via REST
     import httpx
     c = httpx.Client(base_url="http://localhost:5000", timeout=10)
 
@@ -19,20 +19,20 @@ async def test():
     }).json()
     qz = c.post("/api/quizzes", json={"name": "WS Test Quiz"}).json()
     c.post(f"/api/quizzes/{qz['id']}/questions", json={"question_id": q["id"]})
-    sess = c.post("/api/sessions", json={"quiz_id": qz["id"]}).json()
-    init = c.post(f"/api/sessions/{sess['id']}/init-game").json()
-    print(f"Session #{sess['id']} created, game init: {init}")
+    game = c.post("/api/games", json={"quiz_id": qz["id"]}).json()
+    init = c.post(f"/api/games/{game['id']}/init").json()
+    print(f"Game #{game['id']} created, engine init: {init}")
 
-    sid = sess["id"]
+    gid = game["id"]
 
     # Connect as instructor
     print("\n--- Connecting instructor WS ---")
-    instr_ws = await websockets.connect(f"ws://localhost:5000/ws/instructor/{sid}")
+    instr_ws = await websockets.connect(f"ws://localhost:5000/ws/instructor/{gid}")
     print(f"Instructor connected: {instr_ws}")
 
     # Connect as student
     print("\n--- Connecting student WS ---")
-    student_ws = await websockets.connect(f"ws://localhost:5000/ws/student/{sid}")
+    student_ws = await websockets.connect(f"ws://localhost:5000/ws/student/{gid}")
     print(f"Student connected: {student_ws}")
 
     # Student sends join
@@ -100,7 +100,7 @@ async def test():
     await student_ws.close()
     await instr_ws.close()
 
-    c.delete(f"/api/sessions/{sid}")
+    c.delete(f"/api/games/{gid}")
     c.delete(f"/api/quizzes/{qz['id']}")
     c.delete(f"/api/questions/{q['id']}")
     c.delete(f"/api/topics/{t['id']}")

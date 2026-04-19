@@ -25,7 +25,7 @@
             </div>
 
             <div>
-                <input id="session-id" type="number" placeholder="Session ID"
+                <input id="game-id" type="number" placeholder="Game ID"
                     class="w-full px-4 py-3 rounded-xl bg-slate-700 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg"
                     min="1" autocomplete="off">
             </div>
@@ -48,26 +48,26 @@
         }).catch(() => {});
 
         const nameInput = document.getElementById('player-name');
-        const sessionInput = document.getElementById('session-id');
+        const gameInput = document.getElementById('game-id');
         const errorMsg = document.getElementById('error-msg');
 
         nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinGame(); });
-        sessionInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinGame(); });
+        gameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinGame(); });
 
         function joinGame() {
             const name = nameInput.value.trim();
-            const sessionId = sessionInput.value.trim();
+            const gameId = gameInput.value.trim();
 
             if (!name) {
                 showError('Please enter your name.');
                 return;
             }
-            if (!sessionId) {
-                showError('Please enter the session ID.');
+            if (!gameId) {
+                showError('Please enter the game ID.');
                 return;
             }
 
-            window.location.href = `/play?session=${sessionId}&name=${encodeURIComponent(name)}`;
+            window.location.href = `/play?game=${gameId}&name=${encodeURIComponent(name)}`;
         }
 
         function showError(msg) {

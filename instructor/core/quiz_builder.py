@@ -22,7 +22,7 @@ class QuizDialog(QDialog):
         self.desc_input = QTextEdit()
         self.desc_input.setPlaceholderText("Optional description")
         self.desc_input.setMaximumHeight(80)
-        self.randomize_check = QCheckBox("Randomize question order each session")
+        self.randomize_check = QCheckBox("Randomize question order each game")
 
         if quiz:
             self.name_input.setText(quiz.get("name", ""))

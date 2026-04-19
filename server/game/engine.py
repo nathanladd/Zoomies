@@ -128,12 +128,12 @@ class GameEngine(BaseGame):
 
     def __init__(
         self,
-        session_id: int,
+        game_id: int,
         quiz_name: str,
         questions: list[dict[str, Any]],
         randomize_order: bool = False,
     ):
-        self.session_id = session_id
+        self.game_id = game_id
         self.quiz_name = quiz_name
         self.randomize_order = randomize_order
 
@@ -253,7 +253,7 @@ class GameEngine(BaseGame):
 
     def get_status(self) -> dict[str, Any]:
         return {
-            "session_id": self.session_id,
+            "game_id": self.game_id,
             "status": self.status,
             "current_index": self.current_index,
             "question_count": self.question_count,

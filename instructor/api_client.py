@@ -95,30 +95,30 @@ class ApiClient:
     def remove_question_from_quiz(self, quiz_id: int, question_id: int) -> None:
         self.client.delete(f"/api/quizzes/{quiz_id}/questions/{question_id}")
 
-    # ── Sessions ───────────────────────────────────────────────────────────
+    # ── Games ──────────────────────────────────────────────────────────────
 
-    def list_sessions(self, quiz_id: int | None = None, status: str | None = None) -> list[dict[str, Any]]:
+    def list_games(self, quiz_id: int | None = None, status: str | None = None) -> list[dict[str, Any]]:
         params = {}
         if quiz_id is not None:
             params["quiz_id"] = quiz_id
         if status is not None:
             params["status"] = status
-        return self.client.get("/api/sessions", params=params).json()
+        return self.client.get("/api/games", params=params).json()
 
-    def create_session(self, quiz_id: int) -> dict[str, Any]:
-        return self.client.post("/api/sessions", json={"quiz_id": quiz_id}).json()
+    def create_game(self, quiz_id: int) -> dict[str, Any]:
+        return self.client.post("/api/games", json={"quiz_id": quiz_id}).json()
 
-    def init_game(self, session_id: int) -> dict[str, Any]:
-        return self.client.post(f"/api/sessions/{session_id}/init-game").json()
+    def init_game(self, game_id: int) -> dict[str, Any]:
+        return self.client.post(f"/api/games/{game_id}/init").json()
 
-    def get_session(self, session_id: int) -> dict[str, Any]:
-        return self.client.get(f"/api/sessions/{session_id}").json()
+    def get_game(self, game_id: int) -> dict[str, Any]:
+        return self.client.get(f"/api/games/{game_id}").json()
 
-    def get_session_players(self, session_id: int) -> list[dict[str, Any]]:
-        return self.client.get(f"/api/sessions/{session_id}/players").json()
+    def get_game_players(self, game_id: int) -> list[dict[str, Any]]:
+        return self.client.get(f"/api/games/{game_id}/players").json()
 
-    def delete_session(self, session_id: int) -> None:
-        self.client.delete(f"/api/sessions/{session_id}")
+    def delete_game(self, game_id: int) -> None:
+        self.client.delete(f"/api/games/{game_id}")
 
     # ── Admin (backup / restore) ────────────────────────────────────────────────────
 
