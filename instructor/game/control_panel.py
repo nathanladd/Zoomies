@@ -255,28 +255,24 @@ class GameControlPanel(QWidget):
         self._qa_choice_labels: list[QLabel] = []
         layout.addWidget(qa_group)
 
-        # ── Bottom section: Leaderboard (left) + Consoles (right) ────────
-        bottom_splitter = QSplitter(Qt.Orientation.Horizontal)
-
-        # Leaderboard
-        lb_group = QGroupBox("Live Leaderboard")
-        lb_layout = QVBoxLayout(lb_group)
+        # ── Dockable panels (built here, docked by MainWindow) ────────────
+        # The leaderboard and both consoles live in QDockWidgets owned by
+        # MainWindow so the instructor can move/hide them. The dock widget's
+        # title bar already labels each panel, so the inner container is a
+        # plain QWidget with no additional title.
+        self.leaderboard_group = QWidget()
+        lb_layout = QVBoxLayout(self.leaderboard_group)
+        lb_layout.setContentsMargins(0, 0, 0, 0)
         self.lb_table = QTableWidget()
         self.lb_table.setColumnCount(3)
         self.lb_table.setHorizontalHeaderLabels(["Rank", "Name", "Score"])
         self.lb_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.lb_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         lb_layout.addWidget(self.lb_table)
-        bottom_splitter.addWidget(lb_group)
 
-        # Console panel (right side)
-        console_widget = QWidget()
-        console_layout = QVBoxLayout(console_widget)
-        console_layout.setContentsMargins(0, 0, 0, 0)
-
-        # Server console (server is started and owned by MainWindow)
-        srv_group = QGroupBox("Server Console")
-        srv_layout = QVBoxLayout(srv_group)
+        self.server_console_group = QWidget()
+        srv_layout = QVBoxLayout(self.server_console_group)
+        srv_layout.setContentsMargins(0, 0, 0, 0)
         self.server_console = QPlainTextEdit()
         self.server_console.setReadOnly(True)
         self.server_console.setMaximumBlockCount(500)
@@ -285,11 +281,10 @@ class GameControlPanel(QWidget):
             "background-color: #1a1a2e; color: #a5b4fc;"
         )
         srv_layout.addWidget(self.server_console)
-        console_layout.addWidget(srv_group)
 
-        # Instructor console
-        instr_group = QGroupBox("Instructor Console")
-        instr_layout = QVBoxLayout(instr_group)
+        self.instructor_console_group = QWidget()
+        instr_layout = QVBoxLayout(self.instructor_console_group)
+        instr_layout.setContentsMargins(0, 0, 0, 0)
         self.instructor_console = QPlainTextEdit()
         self.instructor_console.setReadOnly(True)
         self.instructor_console.setMaximumBlockCount(500)
@@ -298,12 +293,8 @@ class GameControlPanel(QWidget):
             "background-color: #1a1a2e; color: #6ee7b7;"
         )
         instr_layout.addWidget(self.instructor_console)
-        console_layout.addWidget(instr_group)
 
-        bottom_splitter.addWidget(console_widget)
-        bottom_splitter.setStretchFactor(0, 1)
-        bottom_splitter.setStretchFactor(1, 1)
-        layout.addWidget(bottom_splitter, stretch=1)
+        layout.addStretch(1)
 
     def _refresh_quizzes(self):
         self.quiz_combo.clear()

@@ -192,3 +192,30 @@ INFO:     127.0.0.1:59099 - "GET /api/quizzes HTTP/1.1" 200 OK
 INFO:     127.0.0.1:59099 - "GET /api/quizzes HTTP/1.1" 200 OK
 INFO:     127.0.0.1:60206 - "POST /api/games HTTP/1.1" 201 Created
 INFO:     127.0.0.1:60206 - "POST /api/games/15/init HTTP/1.1" 200 OK
+[WS-INSTR] Connection attempt for game 15
+[WS-INSTR] Connected for game 15
+[WS-INSTR] Instructor disconnected from game 15
+INFO:     127.0.0.1:62014 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62022 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62022 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62022 - "GET /api/questions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62022 - "GET /api/quizzes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62022 - "GET /api/quizzes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65223 - "POST /api/games HTTP/1.1" 201 Created
+INFO:     127.0.0.1:65223 - "POST /api/games/16/init HTTP/1.1" 200 OK
+[WS-INSTR] Connection attempt for game 16
+[WS-INSTR] Connected for game 16
+[WS-INSTR] Received: start_game
+[WS-INSTR] Broadcasting game_start to 0 students
+[WS-INSTR] Received: next_question
+[WS-INSTR] next_question result: Q0
+[WS-INSTR] Broadcasting question_start to 0 students, choices=['A) True', 'B) False']
+[WS-INSTR] Instructor disconnected from game 16
+INFO:     127.0.0.1:60597 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60604 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60604 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60604 - "GET /api/questions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60604 - "GET /api/quizzes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60604 - "GET /api/quizzes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60620 - "POST /api/games HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60620 - "POST /api/games/17/init HTTP/1.1" 200 OK
