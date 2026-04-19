@@ -42,3 +42,9 @@ INFO:     connection closed
 INFO:     127.0.0.1:52426 - "WebSocket /ws/instructor/12" [accepted]
 INFO:     connection open
 INFO:     connection closed
+INFO:     127.0.0.1:61652 - "WebSocket /ws/instructor/13" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:61680 - "WebSocket /ws/instructor/14" [accepted]
+INFO:     connection open
+INFO:     connection closed

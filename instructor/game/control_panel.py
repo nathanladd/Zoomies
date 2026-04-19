@@ -144,6 +144,10 @@ class WebSocketThread(QThread):
 
 
 class GameControlPanel(QWidget):
+    # Emitted whenever the projection window's visibility changes so the
+    # View menu checkmark can stay in sync.
+    projection_visibility_changed = pyqtSignal(bool)
+
     def __init__(self, api: ApiClient, server_process: QProcess | None = None):
         super().__init__()
         self.api = api
@@ -181,20 +185,14 @@ class GameControlPanel(QWidget):
         row1.addStretch()
         setup_layout.addLayout(row1)
 
-        # New Game + Open Projection live on the same row; the projection
-        # toggle sits immediately to the right of New Game so instructors can
-        # start a game and throw it onto the projector without mousing across
-        # the panel.
+        # New Game lives on its own row; projection visibility is driven by
+        # the View menu's "Projection Window" check item.
         row2 = QHBoxLayout()
         self.btn_create_game = QPushButton("New Game")
         self.btn_create_game.clicked.connect(self._create_game)
-        self.btn_projection = QPushButton("Open Projection")
-        self.btn_projection.clicked.connect(self._toggle_projection)
-        self.btn_projection.setEnabled(False)
         self.game_label = QLabel("No active game")
         self.game_label.setStyleSheet("font-weight: bold;")
         row2.addWidget(self.btn_create_game)
-        row2.addWidget(self.btn_projection)
         row2.addWidget(self.game_label)
         row2.addStretch()
         setup_layout.addLayout(row2)
@@ -348,7 +346,7 @@ class GameControlPanel(QWidget):
         else:
             self.projection_window.reset_for_new_game(self.current_game_id)
         self.projection_window.show()
-        self.btn_projection.setText("Close Projection")
+        self.projection_visibility_changed.emit(True)
 
         self._connect_ws()
 
@@ -408,7 +406,6 @@ class GameControlPanel(QWidget):
         self.status_label.setText("Status: Connected (waiting for players)")
         self.btn_start.setEnabled(True)
         self.btn_end.setEnabled(True)
-        self.btn_projection.setEnabled(True)
 
     def _on_ws_disconnected(self):
         self.status_label.setText("Status: Disconnected")
@@ -513,10 +510,13 @@ class GameControlPanel(QWidget):
         if reply == QMessageBox.StandardButton.Yes and self.ws_thread:
             self.ws_thread.send({"type": "end_game"})
 
-    def _toggle_projection(self):
-        # The projection window is a long-lived singleton: all WS-driven
-        # updates keep flowing into it regardless of visibility, so toggling
-        # is just a show/hide. On first toggle it's lazily created.
+    def toggle_projection(self) -> bool:
+        """Show/hide the projection window. Returns new visible state.
+
+        The projection window is a long-lived singleton: all WS-driven
+        updates keep flowing into it regardless of visibility, so toggling
+        is just a show/hide. On first toggle it's lazily created.
+        """
         if self.projection_window is None:
             self.projection_window = ProjectionWindow(
                 game_id=self.current_game_id,
@@ -525,10 +525,15 @@ class GameControlPanel(QWidget):
 
         if self.projection_window.isVisible():
             self.projection_window.hide()
-            self.btn_projection.setText("Open Projection")
+            visible = False
         else:
             self.projection_window.show()
-            self.btn_projection.setText("Close Projection")
+            visible = True
+        self.projection_visibility_changed.emit(visible)
+        return visible
+
+    def is_projection_visible(self) -> bool:
+        return self.projection_window is not None and self.projection_window.isVisible()
 
     def _update_leaderboard(self, scores: list[dict]):
         self.lb_table.setRowCount(len(scores))

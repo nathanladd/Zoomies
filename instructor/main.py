@@ -182,11 +182,29 @@ class MainWindow(QMainWindow):
         quit_action.triggered.connect(self.close)
         file_menu.addAction(quit_action)
 
-        # View menu — dock visibility toggles
+        # View menu — dock visibility toggles + projection window toggle
         view_menu = menubar.addMenu("&View")
         for dock in (self.dock_topics, self.dock_questions, self.dock_quizzes):
             action = dock.toggleViewAction()  # checkable, auto-synced with the dock
             view_menu.addAction(action)
+
+        view_menu.addSeparator()
+
+        self.projection_action = QAction("&Projection Window", self)
+        self.projection_action.setCheckable(True)
+        self.projection_action.setChecked(self.game_panel.is_projection_visible())
+        # Ignore the auto-toggled `checked` arg — toggle_projection() decides
+        # the real state from the window's current visibility and emits
+        # projection_visibility_changed, which re-syncs the checkmark.
+        self.projection_action.triggered.connect(
+            lambda _checked: self.game_panel.toggle_projection()
+        )
+        # Keep the checkmark in sync when the panel opens/closes the window
+        # itself (e.g. on New Game).
+        self.game_panel.projection_visibility_changed.connect(
+            self.projection_action.setChecked,
+        )
+        view_menu.addAction(self.projection_action)
 
         # Database menu
         db_menu = menubar.addMenu("&Database")
