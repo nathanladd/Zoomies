@@ -179,23 +179,20 @@ class GameControlPanel(QWidget):
         self.quiz_combo.setMinimumWidth(250)
         btn_refresh = QPushButton("Refresh")
         btn_refresh.clicked.connect(self._refresh_quizzes)
+        self.btn_create_game = QPushButton("New Game")
+        self.btn_create_game.clicked.connect(self._create_game)
+        self.btn_create_game.setStyleSheet(
+            "QPushButton { background-color: #86efac; color: #052e16; "
+            "font-weight: bold; padding: 4px 12px; border-radius: 4px; } "
+            "QPushButton:hover { background-color: #4ade80; } "
+            "QPushButton:pressed { background-color: #22c55e; }"
+        )
         row1.addWidget(QLabel("Quiz:"))
         row1.addWidget(self.quiz_combo)
         row1.addWidget(btn_refresh)
+        row1.addWidget(self.btn_create_game)
         row1.addStretch()
         setup_layout.addLayout(row1)
-
-        # New Game lives on its own row; projection visibility is driven by
-        # the View menu's "Projection Window" check item.
-        row2 = QHBoxLayout()
-        self.btn_create_game = QPushButton("New Game")
-        self.btn_create_game.clicked.connect(self._create_game)
-        self.game_label = QLabel("No active game")
-        self.game_label.setStyleSheet("font-weight: bold;")
-        row2.addWidget(self.btn_create_game)
-        row2.addWidget(self.game_label)
-        row2.addStretch()
-        setup_layout.addLayout(row2)
 
         layout.addWidget(setup_group)
 
@@ -203,15 +200,21 @@ class GameControlPanel(QWidget):
         controls_group = QGroupBox("Game Controls")
         controls_layout = QVBoxLayout(controls_group)
 
+        status_row = QHBoxLayout()
         self.status_label = QLabel("Status: Not connected")
         self.status_label.setStyleSheet("font-size: 14px;")
-        controls_layout.addWidget(self.status_label)
+        self.game_label = QLabel("No active game")
+        self.game_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        status_row.addWidget(self.status_label)
+        status_row.addStretch()
+        status_row.addWidget(self.game_label)
+        controls_layout.addLayout(status_row)
 
         btn_row = QHBoxLayout()
         self.btn_start = QPushButton("Start Game")
         self.btn_start.clicked.connect(self._start_game)
         self.btn_start.setEnabled(False)
-        self.btn_next = QPushButton("Next Question")
+        self.btn_next = QPushButton("First Question")
         self.btn_next.clicked.connect(self._next_question)
         self.btn_next.setEnabled(False)
         self.btn_reveal = QPushButton("Reveal Answer")
@@ -224,6 +227,14 @@ class GameControlPanel(QWidget):
         for btn in [self.btn_start, self.btn_next, self.btn_reveal, self.btn_end]:
             btn.setMinimumHeight(40)
             btn.setStyleSheet("font-size: 14px; font-weight: bold;")
+        # Applied after the shared style so it isn't overwritten.
+        self.btn_end.setStyleSheet(
+            "QPushButton { font-size: 14px; font-weight: bold; "
+            "background-color: #fca5a5; color: #450a0a; } "
+            "QPushButton:hover { background-color: #f87171; } "
+            "QPushButton:pressed { background-color: #ef4444; } "
+            "QPushButton:disabled { background-color: #4b1d1d; color: #9a6a6a; }"
+        )
         btn_row.addWidget(self.btn_start)
         btn_row.addWidget(self.btn_next)
         btn_row.addWidget(self.btn_reveal)
@@ -377,6 +388,7 @@ class GameControlPanel(QWidget):
         self.status_label.setText("Status: Connecting...")
         self.btn_start.setEnabled(False)
         self.btn_next.setEnabled(False)
+        self.btn_next.setText("First Question")
         self.btn_reveal.setEnabled(False)
         self.btn_end.setEnabled(False)
 
@@ -426,6 +438,8 @@ class GameControlPanel(QWidget):
 
         elif msg_type == "game_start":
             self.status_label.setText("Status: Game started!")
+            if self.current_game_id is not None:
+                self.game_label.setText(f"Game #{self.current_game_id} (running)")
             self.btn_start.setEnabled(False)
             self.btn_next.setEnabled(True)
             if self.projection_window:
@@ -437,6 +451,7 @@ class GameControlPanel(QWidget):
             self.q_label.setText(f"Question: {idx + 1} / {total}")
             self.answers_label.setText(f"Answers: 0/?")
             self.btn_next.setEnabled(False)
+            self.btn_next.setText("Next Question")
             self.btn_reveal.setEnabled(True)
             self._show_question(msg)
             if self.projection_window:
@@ -472,6 +487,8 @@ class GameControlPanel(QWidget):
 
         elif msg_type == "game_end":
             self.status_label.setText("Status: Game finished!")
+            self.game_label.setText("No active game")
+            self.current_game_id = None
             self.btn_next.setEnabled(False)
             self.btn_reveal.setEnabled(False)
             self.btn_end.setEnabled(False)

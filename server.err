@@ -57,3 +57,24 @@ INFO:     connection closed
 INFO:     127.0.0.1:60626 - "WebSocket /ws/instructor/17" [accepted]
 INFO:     connection open
 INFO:     connection closed
+INFO:     127.0.0.1:54940 - "WebSocket /ws/instructor/18" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:63065 - "WebSocket /ws/instructor/19" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:54519 - "WebSocket /ws/instructor/20" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:54985 - "WebSocket /ws/instructor/21" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:64220 - "WebSocket /ws/instructor/22" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:60766 - "WebSocket /ws/instructor/23" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:60811 - "WebSocket /ws/instructor/24" [accepted]
+INFO:     connection open
+INFO:     connection closed
