@@ -278,22 +278,7 @@ class ProjectionWindow(QWidget):
             )
         self.question_label.setText(
             f'<div style="text-align:center;">'
-            f'<div style="font-size:58px; font-weight:bold; color:#818cf8; margin-bottom:8px;">ZÜNDPUNKT</div>'
-            f'<div style="font-size:18px; font-style:italic; color:#94a3b8; '
-            f'max-width:820px; margin:0 auto 4px auto; line-height:1.5;">'
-            f'Zündpunkt — the ignition point — the moment pressure and fuel '
-            f'combine and something useful happens.'
-            f'</div>'
-            f'<div style="font-size:14px; color:#64748b; margin-bottom:20px;">'
-            f'(What I think Rudolf Diesel would call this game.)'
-            f'</div>'
-            f'<div style="font-size:17px; font-style:italic; color:#cbd5e1; '
-            f'max-width:760px; margin:0 auto 4px auto; line-height:1.5;">'
-            f'&ldquo;Do not fear failure, but rather fear not trying at all.&rdquo;'
-            f'</div>'
-            f'<div style="font-size:13px; color:#64748b; margin-bottom:28px;">'
-            f'\u2014 Rudolf Diesel'
-            f'</div>'
+            f'<div style="font-size:58px; font-weight:bold; color:#818cf8; margin-bottom:28px;">Project Needs a Name</div>'
             f'<div style="font-size:20px; color:#94a3b8; margin-bottom:4px;">Join at</div>'
             f'<div style="font-size:40px; font-weight:bold; color:#818cf8; margin-bottom:16px;">{self._join_url}</div>'
             f'<div style="font-size:32px; font-weight:bold; color:#34d399; margin-bottom:16px;">{game_text}</div>'
@@ -442,17 +427,77 @@ class ProjectionWindow(QWidget):
             item = self.lb_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+            elif item.layout():
+                self._clear_layout(item.layout())
 
-        medals = ["🥇", "🥈", "🥉"]
-        for i, s in enumerate(scores):
-            row = QLabel()
-            medal = medals[i] if i < 3 else f"  {i + 1}."
-            name = s.get("name", "")
-            score = s.get("total_score", 0)
-            row.setText(f"  {medal}  {name}    —    {score:,} pts")
-            row.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold if i < 3 else QFont.Weight.Normal))
-            color = "#fbbf24" if i == 0 else "#9ca3af" if i == 1 else "#d97706" if i == 2 else "#94a3b8"
-            row.setStyleSheet(f"color: {color}; padding: 4px;")
-            self.lb_layout.addWidget(row)
+        top = scores[:3]
+        # Podium arrangement: 2nd (left), 1st (center, tallest), 3rd (right)
+        order = []
+        if len(top) >= 2:
+            order.append((2, top[1]))
+        if len(top) >= 1:
+            order.append((1, top[0]))
+        if len(top) >= 3:
+            order.append((3, top[2]))
 
+        podium = QHBoxLayout()
+        podium.setSpacing(24)
+        podium.setContentsMargins(40, 12, 40, 12)
+        podium.addStretch()
+
+        heights = {1: 200, 2: 150, 3: 110}
+        colors = {1: "#fbbf24", 2: "#9ca3af", 3: "#d97706"}
+        medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+
+        for place, s in order:
+            col = QVBoxLayout()
+            col.setSpacing(6)
+            col.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
+
+            medal_lbl = QLabel(medals[place])
+            medal_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            medal_lbl.setStyleSheet("font-size: 54px; background: transparent;")
+
+            name_lbl = QLabel(s.get("name", ""))
+            name_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            name_lbl.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
+            name_lbl.setStyleSheet(f"color: {colors[place]}; background: transparent;")
+
+            score_lbl = QLabel(f"{s.get('total_score', 0):,} pts")
+            score_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            score_lbl.setFont(QFont("Segoe UI", 16))
+            score_lbl.setStyleSheet("color: #e2e8f0; background: transparent;")
+
+            block = QFrame()
+            block.setFixedHeight(heights[place])
+            block.setMinimumWidth(180)
+            block.setStyleSheet(
+                f"background-color: {colors[place]}; border-top-left-radius: 12px; "
+                f"border-top-right-radius: 12px;"
+            )
+            block_layout = QVBoxLayout(block)
+            block_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            place_lbl = QLabel(str(place))
+            place_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            place_lbl.setFont(QFont("Segoe UI", 48, QFont.Weight.Bold))
+            place_lbl.setStyleSheet("color: #0f172a; background: transparent;")
+            block_layout.addWidget(place_lbl)
+
+            col.addWidget(medal_lbl)
+            col.addWidget(name_lbl)
+            col.addWidget(score_lbl)
+            col.addWidget(block)
+
+            podium.addLayout(col)
+
+        podium.addStretch()
+        self.lb_layout.addLayout(podium)
         self.leaderboard_widget.show()
+
+    def _clear_layout(self, layout):
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                self._clear_layout(item.layout())

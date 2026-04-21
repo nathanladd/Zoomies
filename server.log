@@ -315,3 +315,144 @@ INFO:     127.0.0.1:60759 - "POST /api/games/23/init HTTP/1.1" 200 OK
 [WS-INSTR] Received: end_game
 INFO:     127.0.0.1:60804 - "POST /api/games HTTP/1.1" 201 Created
 INFO:     127.0.0.1:60804 - "POST /api/games/24/init HTTP/1.1" 200 OK
+[WS-INSTR] Connection attempt for game 24
+[WS-INSTR] Connected for game 24
+[WS-INSTR] Instructor disconnected from game 24
+INFO:     127.0.0.1:63117 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63117 - "GET /api/version HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51057 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51064 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51064 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51064 - "GET /api/questions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51064 - "GET /api/quizzes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51064 - "GET /api/quizzes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58929 - "POST /api/games HTTP/1.1" 201 Created
+INFO:     127.0.0.1:58929 - "POST /api/games/25/init HTTP/1.1" 200 OK
+[WS-INSTR] Connection attempt for game 25
+[WS-INSTR] Connected for game 25
+INFO:     127.0.0.1:65453 - "GET /play?game=25&name=nate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65453 - "GET /static/game/js/game.js?v=4 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:65453 - "GET /api/version HTTP/1.1" 200 OK
+[WS-STUDENT] Connection attempt for game 25
+[WS-STUDENT] Accepted for game 25
+[WS-STUDENT] Received: {'type': 'player_join', 'name': 'nate'}
+[WS-STUDENT] Player 2 (nate) joined game 25
+[WS-INSTR] Received: start_game
+[WS-INSTR] Broadcasting game_start to 1 students
+[WS-INSTR] Received: next_question
+[WS-INSTR] next_question result: Q0
+[WS-INSTR] Broadcasting question_start to 1 students, choices=['A) True', 'B) False']
+[WS-INSTR] Instructor disconnected from game 25
+INFO:     127.0.0.1:65381 - "PUT /api/games/25/end HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65381 - "POST /api/games HTTP/1.1" 201 Created
+INFO:     127.0.0.1:65381 - "POST /api/games/26/init HTTP/1.1" 200 OK
+[WS-INSTR] Connection attempt for game 26
+[WS-INSTR] Connected for game 26
+[WS-INSTR] Received: start_game
+[WS-INSTR] Broadcasting game_start to 0 students
+[WS-INSTR] Received: next_question
+[WS-INSTR] next_question result: Q0
+[WS-INSTR] Broadcasting question_start to 0 students, choices=['A) True', 'B) False']
+[WS-INSTR] Received: reveal
+[WS-INSTR] Received: next_question
+[WS-INSTR] next_question result: None (no more)
+INFO:     127.0.0.1:63419 - "POST /api/games HTTP/1.1" 201 Created
+INFO:     127.0.0.1:63419 - "POST /api/games/27/init HTTP/1.1" 200 OK
+[WS-INSTR] Connection attempt for game 27
+[WS-INSTR] Connected for game 27
+INFO:     127.0.0.1:51578 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51578 - "GET /api/version HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65210 - "GET /play?game=27&name=nate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65210 - "GET /api/version HTTP/1.1" 200 OK
+[WS-STUDENT] Connection attempt for game 27
+[WS-STUDENT] Accepted for game 27
+[WS-STUDENT] Received: {'type': 'player_join', 'name': 'nate'}
+[WS-STUDENT] Player 3 (nate) joined game 27
+[WS-INSTR] Received: start_game
+[WS-INSTR] Broadcasting game_start to 1 students
+[WS-INSTR] Received: next_question
+[WS-INSTR] next_question result: Q0
+[WS-INSTR] Broadcasting question_start to 1 students, choices=['A) True', 'B) False']
+[WS-INSTR] Received: end_game
+INFO:     127.0.0.1:54259 - "POST /api/games HTTP/1.1" 201 Created
+INFO:     127.0.0.1:54259 - "POST /api/games/28/init HTTP/1.1" 200 OK
+[WS-INSTR] Connection attempt for game 28
+[WS-INSTR] Connected for game 28
+[WS-INSTR] Instructor disconnected from game 28
+INFO:     127.0.0.1:55736 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55740 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55740 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55740 - "GET /api/questions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55740 - "GET /api/quizzes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55740 - "GET /api/quizzes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55744 - "POST /api/games HTTP/1.1" 201 Created
+INFO:     127.0.0.1:55744 - "POST /api/games/29/init HTTP/1.1" 200 OK
+[WS-INSTR] Connection attempt for game 29
+[WS-INSTR] Connected for game 29
+[WS-INSTR] Instructor disconnected from game 29
+INFO:     127.0.0.1:64342 - "PUT /api/games/29/end HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64342 - "POST /api/games HTTP/1.1" 201 Created
+INFO:     127.0.0.1:64342 - "POST /api/games/30/init HTTP/1.1" 200 OK
+[WS-INSTR] Connection attempt for game 30
+[WS-INSTR] Connected for game 30
+INFO:     192.168.68.54:63909 - "GET / HTTP/1.1" 200 OK
+INFO:     192.168.68.54:63909 - "GET /api/version HTTP/1.1" 200 OK
+INFO:     192.168.68.54:63909 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     192.168.68.54:59510 - "GET /play?game=30&name=nate HTTP/1.1" 200 OK
+INFO:     192.168.68.54:59510 - "GET /static/game/css/styles.css?v=4 HTTP/1.1" 200 OK
+INFO:     192.168.68.54:56599 - "GET /static/game/js/game.js?v=4 HTTP/1.1" 200 OK
+INFO:     192.168.68.54:56599 - "GET /api/version HTTP/1.1" 200 OK
+[WS-STUDENT] Connection attempt for game 30
+[WS-STUDENT] Accepted for game 30
+[WS-STUDENT] Received: {'type': 'player_join', 'name': 'nate'}
+[WS-STUDENT] Player 4 (nate) joined game 30
+[WS-INSTR] Received: start_game
+[WS-INSTR] Broadcasting game_start to 1 students
+[WS-INSTR] Received: next_question
+[WS-INSTR] next_question result: Q0
+[WS-INSTR] Broadcasting question_start to 1 students, choices=['A) True', 'B) False']
+[WS-INSTR] Instructor disconnected from game 30
+INFO:     127.0.0.1:55793 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56507 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56507 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56507 - "GET /api/questions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56507 - "GET /api/quizzes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56507 - "GET /api/quizzes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54968 - "POST /api/games HTTP/1.1" 201 Created
+INFO:     127.0.0.1:54968 - "POST /api/games/31/init HTTP/1.1" 200 OK
+[WS-INSTR] Connection attempt for game 31
+[WS-INSTR] Connected for game 31
+INFO:     10.77.13.4:60835 - "GET / HTTP/1.1" 200 OK
+INFO:     10.77.13.4:60835 - "GET /api/version HTTP/1.1" 200 OK
+INFO:     10.77.13.4:56091 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     10.77.13.4:50176 - "GET /play?game=31&name=nate HTTP/1.1" 200 OK
+INFO:     10.77.13.4:61748 - "GET /static/game/js/game.js?v=4 HTTP/1.1" 200 OK
+INFO:     10.77.13.4:50176 - "GET /static/game/css/styles.css?v=4 HTTP/1.1" 200 OK
+INFO:     10.77.13.4:61748 - "GET /api/version HTTP/1.1" 200 OK
+[WS-STUDENT] Connection attempt for game 31
+[WS-STUDENT] Accepted for game 31
+[WS-STUDENT] Received: {'type': 'player_join', 'name': 'nate'}
+[WS-STUDENT] Player 5 (nate) joined game 31
+[WS-INSTR] Received: start_game
+[WS-INSTR] Broadcasting game_start to 1 students
+[WS-INSTR] Received: next_question
+[WS-INSTR] next_question result: Q0
+[WS-INSTR] Broadcasting question_start to 1 students, choices=['A) True', 'B) False']
+[WS-INSTR] Received: end_game
+INFO:     127.0.0.1:52648 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52657 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52657 - "GET /api/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52657 - "GET /api/questions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52657 - "GET /api/quizzes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52657 - "GET /api/quizzes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52657 - "POST /api/games HTTP/1.1" 201 Created
+INFO:     127.0.0.1:52657 - "POST /api/games/32/init HTTP/1.1" 200 OK
+[WS-INSTR] Connection attempt for game 32
+[WS-INSTR] Connected for game 32
+INFO:     10.77.13.3:62133 - "GET / HTTP/1.1" 200 OK
+INFO:     10.77.13.3:62133 - "GET /api/version HTTP/1.1" 200 OK
+INFO:     10.77.13.3:62133 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     10.77.13.3:64943 - "GET /play?game=32&name=Nate HTTP/1.1" 200 OK
+INFO:     10.77.13.3:64943 - "GET /static/game/css/styles.css?v=4 HTTP/1.1" 200 OK
+INFO:     10.77.13.3:61481 - "GET /static/game/js/game.js?v=4 HTTP/1.1" 200 OK
+INFO:     10.77.13.3:64943 - "GET /api/version HTTP/1.1" 200 OK

@@ -78,3 +78,43 @@ INFO:     connection closed
 INFO:     127.0.0.1:60811 - "WebSocket /ws/instructor/24" [accepted]
 INFO:     connection open
 INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:58935 - "WebSocket /ws/instructor/25" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:62356 - "WebSocket /ws/student/25" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:65387 - "WebSocket /ws/instructor/26" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:63425 - "WebSocket /ws/instructor/27" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:51811 - "WebSocket /ws/student/27" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:54265 - "WebSocket /ws/instructor/28" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:55748 - "WebSocket /ws/instructor/29" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:64346 - "WebSocket /ws/instructor/30" [accepted]
+INFO:     connection open
+INFO:     192.168.68.54:49394 - "WebSocket /ws/student/30" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:54972 - "WebSocket /ws/instructor/31" [accepted]
+INFO:     connection open
+INFO:     10.77.13.4:58511 - "WebSocket /ws/student/31" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:50366 - "WebSocket /ws/instructor/32" [accepted]
+INFO:     connection open
+INFO:     10.77.13.3:53411 - "WebSocket /ws/student/32" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
