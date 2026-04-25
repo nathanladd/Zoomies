@@ -35,6 +35,21 @@ async def init_db() -> None:
             Game, Player,
         )
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_run_lightweight_migrations)
+
+
+def _run_lightweight_migrations(sync_conn) -> None:
+    """Best-effort additive ALTER TABLE for SQLite databases pre-dating new columns."""
+    from sqlalchemy import text
+
+    def _column_exists(table: str, column: str) -> bool:
+        rows = sync_conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+        return any(r[1] == column for r in rows)
+
+    if not _column_exists("questions", "randomize_answers"):
+        sync_conn.execute(text(
+            "ALTER TABLE questions ADD COLUMN randomize_answers BOOLEAN NOT NULL DEFAULT 1"
+        ))
 
 
 async def get_db() -> AsyncSession:  # type: ignore[misc]

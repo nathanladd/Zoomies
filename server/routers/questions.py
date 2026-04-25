@@ -19,7 +19,8 @@ def _question_to_read(q: Question) -> QuestionRead:
         text=q.text, image_filename=q.image_filename,
         correct_answer=q.correct_answer, wrong_answer_1=q.wrong_answer_1,
         wrong_answer_2=q.wrong_answer_2, wrong_answer_3=q.wrong_answer_3,
-        time_seconds=q.time_seconds, created_at=q.created_at,
+        time_seconds=q.time_seconds, randomize_answers=q.randomize_answers,
+        created_at=q.created_at,
         topic_name=q.topic.name if q.topic else None,
     )
 
@@ -46,6 +47,10 @@ async def get_question(question_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.post("", response_model=QuestionRead, status_code=201)
 async def create_question(body: QuestionCreate, db: AsyncSession = Depends(get_db)):
+    randomize = body.randomize_answers
+    if randomize is None:
+        # Sensible per-type default: MC randomizes, true/false and tech A/B do not.
+        randomize = body.question_type == "multiple_choice"
     q = Question(
         topic_id=body.topic_id,
         question_type=body.question_type,
@@ -55,6 +60,7 @@ async def create_question(body: QuestionCreate, db: AsyncSession = Depends(get_d
         wrong_answer_2=body.wrong_answer_2,
         wrong_answer_3=body.wrong_answer_3,
         time_seconds=body.time_seconds,
+        randomize_answers=randomize,
     )
     db.add(q)
     await db.commit()

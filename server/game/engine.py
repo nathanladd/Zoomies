@@ -283,13 +283,21 @@ class GameEngine(BaseGame):
         return choices
 
     def _build_display_choices(self, qdata: dict) -> tuple[list[str], str]:
-        """Build labeled display choices (A/B/C/D) with randomization rules."""
+        """Build labeled display choices (A/B/C/D) honoring per-question randomization."""
         labels = ["A", "B", "C", "D"]
         qtype = qdata["question_type"]
+        # Default if unspecified: randomize multiple_choice only.
+        randomize = qdata.get("randomize_answers")
+        if randomize is None:
+            randomize = qtype == "multiple_choice"
 
         if qtype == "true_false":
-            choices = [f"A) True", f"B) False"]
-            correct = "A) True" if qdata["correct_answer"].lower() == "true" else "B) False"
+            order = ["True", "False"]
+            if randomize:
+                random.shuffle(order)
+            choices = [f"{labels[i]}) {order[i]}" for i in range(2)]
+            correct_text = "True" if qdata["correct_answer"].lower() == "true" else "False"
+            correct = next(c for c in choices if c.endswith(f") {correct_text}"))
             return choices, correct
 
         if qtype == "technician_ab":
@@ -299,15 +307,20 @@ class GameEngine(BaseGame):
                 "Both Technician A and Technician B",
                 "Neither Technician A nor Technician B",
             ]
-            choices = [f"{labels[i]}) {fixed[i]}" for i in range(4)]
             correct_map = {"A": 0, "B": 1, "C": 2, "D": 3}
             correct_idx = correct_map.get(qdata["correct_answer"], 0)
-            correct = choices[correct_idx]
+            correct_phrase = fixed[correct_idx]
+            order = list(fixed)
+            if randomize:
+                random.shuffle(order)
+            choices = [f"{labels[i]}) {order[i]}" for i in range(4)]
+            correct = next(c for c in choices if c.endswith(f") {correct_phrase}"))
             return choices, correct
 
-        # multiple_choice: shuffle answers
+        # multiple_choice
         raw = self._get_raw_choices(qdata)
-        random.shuffle(raw)
+        if randomize:
+            random.shuffle(raw)
         choices = [f"{labels[i]}) {raw[i]}" for i in range(len(raw))]
         correct = next(c for c in choices if c.endswith(f") {qdata['correct_answer']}"))
         return choices, correct

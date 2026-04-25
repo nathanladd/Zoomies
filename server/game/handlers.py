@@ -48,6 +48,7 @@ async def load_engine(game_id: int, db: AsyncSession) -> GameEngine:
             "wrong_answer_3": q.wrong_answer_3,
             "time_seconds": q.time_seconds,
             "question_type": q.question_type,
+            "randomize_answers": q.randomize_answers,
         })
 
     engine = GameEngine(

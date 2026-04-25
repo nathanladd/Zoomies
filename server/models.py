@@ -35,7 +35,8 @@ class Question(Base):
     wrong_answer_1: Mapped[str] = mapped_column(String, nullable=False)
     wrong_answer_2: Mapped[str | None] = mapped_column(String, nullable=True)
     wrong_answer_3: Mapped[str | None] = mapped_column(String, nullable=True)
-    time_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    time_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+    randomize_answers: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     topic: Mapped[Topic | None] = relationship(back_populates="questions", lazy="selectin")
