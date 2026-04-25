@@ -158,6 +158,9 @@ class GameControlPanel(QWidget):
         self.projection_window: ProjectionWindow | None = None
         self.current_game_id: int | None = None
         self._players: dict[int, str] = {}  # player_id -> name
+        # player_id -> bool (True correct, False wrong) for the current question.
+        # Cleared on every new question_start and on game_end.
+        self._answer_status: dict[int, bool] = {}
         self._server_process = server_process  # owned by MainWindow
         # Spinner state for collapsing points_update log lines
         self._points_spinner_idx = 0
@@ -278,8 +281,8 @@ class GameControlPanel(QWidget):
         lb_layout = QVBoxLayout(self.leaderboard_group)
         lb_layout.setContentsMargins(0, 0, 0, 0)
         self.lb_table = QTableWidget()
-        self.lb_table.setColumnCount(3)
-        self.lb_table.setHorizontalHeaderLabels(["Rank", "Name", "Score"])
+        self.lb_table.setColumnCount(4)
+        self.lb_table.setHorizontalHeaderLabels(["Rank", "Name", "Answer", "Score"])
         self.lb_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.lb_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         lb_layout.addWidget(self.lb_table)
@@ -400,6 +403,7 @@ class GameControlPanel(QWidget):
     def _reset_ui_for_new_game(self) -> None:
         """Clear labels, leaderboard, question area, and button states."""
         self._players.clear()
+        self._answer_status.clear()
         self.lb_table.setRowCount(0)
         self._clear_question()
         self.q_label.setText("Question: -")
@@ -474,6 +478,10 @@ class GameControlPanel(QWidget):
             self.btn_next.setEnabled(False)
             self.btn_next.setText("Next Question")
             self.btn_reveal.setEnabled(True)
+            # Reset per-question answer markers and refresh leaderboard so the
+            # ✓/✗ column clears between questions.
+            self._answer_status.clear()
+            self._update_leaderboard_from_players()
             self._show_question(msg)
             if self.projection_window:
                 self.projection_window.on_question_start(msg)
@@ -492,6 +500,12 @@ class GameControlPanel(QWidget):
         elif msg_type == "choice_eliminated":
             if self.projection_window:
                 self.projection_window.on_choice_eliminated(msg)
+
+        elif msg_type == "player_answered":
+            pid = msg.get("player_id")
+            if pid is not None:
+                self._answer_status[pid] = bool(msg.get("is_correct", False))
+                self._refresh_answer_column()
 
         elif msg_type == "answer_count":
             self.answers_label.setText(f"Answers: {msg.get('answered', 0)}/{msg.get('total', 0)}")
@@ -514,6 +528,7 @@ class GameControlPanel(QWidget):
             self.btn_reveal.setEnabled(False)
             self.btn_end.setEnabled(False)
             self._players.clear()
+            self._answer_status.clear()
             self.lb_table.setRowCount(0)
             self._clear_question()
             if self.projection_window:
@@ -571,7 +586,17 @@ class GameControlPanel(QWidget):
             self.lb_table.setItem(row, 0, QTableWidgetItem(str(rank)))
             self.lb_table.setItem(row, 1, QTableWidgetItem(s.get("name", "")))
             score = s.get("total_score", 0)
-            self.lb_table.setItem(row, 2, QTableWidgetItem(str(score)))
+            self.lb_table.setItem(row, 3, QTableWidgetItem(str(score)))
+            # Reveal payload carries is_correct/selected per player; prefer
+            # that over the running _answer_status so the marker stays
+            # accurate even for players who never submitted.
+            pid = s.get("player_id")
+            if "is_correct" in s and s.get("selected") is not None:
+                self._set_answer_cell(row, bool(s["is_correct"]))
+            elif pid in self._answer_status:
+                self._set_answer_cell(row, self._answer_status[pid])
+            else:
+                self._set_answer_cell(row, None)
 
     def _show_question(self, msg: dict):
         self.qa_question_label.setText(msg.get("text", ""))
@@ -605,12 +630,44 @@ class GameControlPanel(QWidget):
 
     def _update_leaderboard_from_players(self):
         """Show all joined players with score 0, sorted by name."""
-        names = sorted(self._players.values(), key=str.lower)
-        self.lb_table.setRowCount(len(names))
-        for row, name in enumerate(names):
+        items = sorted(self._players.items(), key=lambda kv: kv[1].lower())
+        self.lb_table.setRowCount(len(items))
+        for row, (pid, name) in enumerate(items):
             self.lb_table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
             self.lb_table.setItem(row, 1, QTableWidgetItem(name))
-            self.lb_table.setItem(row, 2, QTableWidgetItem("0"))
+            self.lb_table.setItem(row, 3, QTableWidgetItem("0"))
+            self._set_answer_cell(row, self._answer_status.get(pid))
+
+    def _refresh_answer_column(self):
+        """Update only the Answer column for the current rows by matching name.
+
+        The leaderboard rows are keyed by player name (the same source used
+        when building them), so we resolve each row back to a player_id via
+        self._players to look up its current ✓/✗ state.
+        """
+        name_to_pid = {n: pid for pid, n in self._players.items()}
+        for row in range(self.lb_table.rowCount()):
+            name_item = self.lb_table.item(row, 1)
+            if not name_item:
+                continue
+            pid = name_to_pid.get(name_item.text())
+            self._set_answer_cell(row, self._answer_status.get(pid))
+
+    def _set_answer_cell(self, row: int, is_correct: bool | None):
+        """Set the Answer column cell for a row. None clears the marker."""
+        if is_correct is None:
+            item = QTableWidgetItem("")
+        elif is_correct:
+            item = QTableWidgetItem("\u2713")  # ✓
+            item.setForeground(Qt.GlobalColor.green)
+        else:
+            item = QTableWidgetItem("\u2717")  # ✗
+            item.setForeground(Qt.GlobalColor.red)
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        font = item.font()
+        font.setBold(True)
+        item.setFont(font)
+        self.lb_table.setItem(row, 2, item)
 
     # ── Log redirect ──────────────────────────────────────────────────────
 

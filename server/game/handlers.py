@@ -154,6 +154,15 @@ async def handle_student_ws(ws: WebSocket, game_id: int) -> None:
                         "answered": answered,
                         "total": total,
                     })
+
+                    # Notify instructor which player answered and whether correct
+                    await manager.send_to_instructor(game_id, {
+                        "type": "player_answered",
+                        "player_id": player_id,
+                        "name": engine.players[player_id]["name"],
+                        "is_correct": bool(result.get("is_correct", False)),
+                    })
+
                 else:
                     await manager.send_to_student(game_id, player_id, {
                         "type": "error",
@@ -162,8 +171,10 @@ async def handle_student_ws(ws: WebSocket, game_id: int) -> None:
 
     except WebSocketDisconnect:
         pass
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[WS-STUDENT] Error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         if player_id is not None:
             manager.disconnect_student(game_id, player_id)
