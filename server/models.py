@@ -39,7 +39,10 @@ class Question(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     topic: Mapped[Topic | None] = relationship(back_populates="questions", lazy="selectin")
-    quiz_links: Mapped[list["QuizQuestion"]] = relationship(back_populates="question", lazy="selectin")
+    quiz_links: Mapped[list["QuizQuestion"]] = relationship(
+        back_populates="question", lazy="selectin",
+        cascade="all, delete-orphan", passive_deletes=True,
+    )
 
 
 class Quiz(Base):
@@ -53,9 +56,12 @@ class Quiz(Base):
 
     quiz_questions: Mapped[list["QuizQuestion"]] = relationship(
         back_populates="quiz", lazy="selectin", order_by="QuizQuestion.position",
-        cascade="all, delete-orphan",
+        cascade="all, delete-orphan", passive_deletes=True,
     )
-    games: Mapped[list["Game"]] = relationship(back_populates="quiz", lazy="selectin")
+    games: Mapped[list["Game"]] = relationship(
+        back_populates="quiz", lazy="selectin",
+        cascade="all, delete-orphan", passive_deletes=True,
+    )
 
 
 class QuizQuestion(Base):
@@ -74,7 +80,7 @@ class Game(Base):
     __tablename__ = "games"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    quiz_id: Mapped[int] = mapped_column(Integer, ForeignKey("quizzes.id"), nullable=False)
+    quiz_id: Mapped[int] = mapped_column(Integer, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="waiting")
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

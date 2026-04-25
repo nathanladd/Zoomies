@@ -4,6 +4,20 @@ from typing import Any
 BASE_URL = "http://localhost:5000"
 
 
+def _raise_for_status(resp: httpx.Response) -> None:
+    """Raise a RuntimeError with the server's detail message on HTTP error."""
+    if resp.is_success:
+        return
+    detail: str
+    try:
+        data = resp.json()
+        detail = data.get("detail") if isinstance(data, dict) else None
+        detail = detail or resp.text
+    except Exception:
+        detail = resp.text or f"HTTP {resp.status_code}"
+    raise RuntimeError(detail)
+
+
 class ApiClient:
     """Synchronous HTTP client for the instructor app to communicate with the server."""
 
@@ -28,7 +42,8 @@ class ApiClient:
         return self.client.put(f"/api/topics/{topic_id}", json=kwargs).json()
 
     def delete_topic(self, topic_id: int) -> None:
-        self.client.delete(f"/api/topics/{topic_id}")
+        resp = self.client.delete(f"/api/topics/{topic_id}")
+        _raise_for_status(resp)
 
     # ── Questions ──────────────────────────────────────────────────────────
 
@@ -48,7 +63,8 @@ class ApiClient:
         return self.client.put(f"/api/questions/{question_id}", json=data).json()
 
     def delete_question(self, question_id: int) -> None:
-        self.client.delete(f"/api/questions/{question_id}")
+        resp = self.client.delete(f"/api/questions/{question_id}")
+        _raise_for_status(resp)
 
     def upload_image(self, question_id: int, filepath: str) -> dict[str, Any]:
         with open(filepath, "rb") as f:
@@ -78,7 +94,8 @@ class ApiClient:
         return self.client.put(f"/api/quizzes/{quiz_id}", json=kwargs).json()
 
     def delete_quiz(self, quiz_id: int) -> None:
-        self.client.delete(f"/api/quizzes/{quiz_id}")
+        resp = self.client.delete(f"/api/quizzes/{quiz_id}")
+        _raise_for_status(resp)
 
     def add_question_to_quiz(self, quiz_id: int, question_id: int, position: int | None = None) -> dict[str, Any]:
         data: dict[str, Any] = {"question_id": question_id}

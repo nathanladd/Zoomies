@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox, QFormLayout, QLineEdit, QTextEdit, QCheckBox,
     QSplitter, QListWidget, QListWidgetItem, QComboBox,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from instructor.api_client import ApiClient
 
@@ -223,16 +223,18 @@ class QuizBuilder(QWidget):
             return
 
         dlg = AddQuestionDialog(self.api, self)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            qid = dlg.selected_question_id()
-            if qid is None:
-                return
-            try:
-                self.api.add_question_to_quiz(self.current_quiz_id, qid)
-                self._load_quiz_questions(self.current_quiz_id)
-                self.refresh_quizzes()
-            except Exception as e:
-                QMessageBox.warning(self, "Error", f"Failed to add question: {e}")
+        dlg.questionPicked.connect(self._on_question_picked)
+        dlg.show()
+
+    def _on_question_picked(self, qid: int):
+        if self.current_quiz_id is None:
+            return
+        try:
+            self.api.add_question_to_quiz(self.current_quiz_id, qid)
+            self._load_quiz_questions(self.current_quiz_id)
+            self.refresh_quizzes()
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to add question: {e}")
 
     def remove_question(self):
         if self.current_quiz_id is None:
@@ -280,13 +282,23 @@ class QuizBuilder(QWidget):
 
 
 class AddQuestionDialog(QDialog):
-    """Dialog to pick a question from the pool to add to a quiz."""
+    """Non-modal dialog to pick questions from the pool and add them to a quiz.
+
+    Stays open across adds so the user can queue up multiple questions. Emits
+    ``questionPicked`` every time the user confirms a selection (via the Add
+    button or a double-click on a row).
+    """
+
+    questionPicked = pyqtSignal(int)
 
     def __init__(self, api: ApiClient, parent=None):
         super().__init__(parent)
         self.api = api
-        self.setWindowTitle("Add Question to Quiz")
+        self.setWindowTitle("Add Questions to Quiz")
         self.setMinimumSize(600, 400)
+        # Non-modal so the quiz builder panel can live-update behind it.
+        self.setModal(False)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
 
         layout = QVBoxLayout(self)
 
@@ -303,6 +315,9 @@ class AddQuestionDialog(QDialog):
         filter_row.addWidget(QLabel("Topic:"))
         filter_row.addWidget(self.topic_filter)
         filter_row.addStretch()
+        self.btn_refresh = QPushButton("Refresh")
+        self.btn_refresh.clicked.connect(self._load_questions)
+        filter_row.addWidget(self.btn_refresh)
         layout.addLayout(filter_row)
 
         self.table = QTableWidget()
@@ -312,15 +327,23 @@ class AddQuestionDialog(QDialog):
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.doubleClicked.connect(self.accept)
+        self.table.doubleClicked.connect(self._emit_selected)
         layout.addWidget(self.table)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        self.status_label = QLabel("Double-click a question or select one and click Add.")
+        self.status_label.setStyleSheet("color: #888;")
+        layout.addWidget(self.status_label)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        self.btn_add = QPushButton("Add")
+        self.btn_add.setDefault(True)
+        self.btn_add.clicked.connect(self._emit_selected)
+        self.btn_close = QPushButton("Close")
+        self.btn_close.clicked.connect(self.close)
+        btn_row.addWidget(self.btn_add)
+        btn_row.addWidget(self.btn_close)
+        layout.addLayout(btn_row)
 
         self._load_questions()
 
@@ -338,8 +361,22 @@ class AddQuestionDialog(QDialog):
             self.table.setItem(row, 2, QTableWidgetItem((q.get("text") or "")[:60]))
             self.table.setItem(row, 3, QTableWidgetItem(q.get("topic_name") or "-"))
 
-    def selected_question_id(self) -> int | None:
+    def _selected_question_id(self) -> int | None:
         row = self.table.currentRow()
         if row < 0:
             return None
-        return int(self.table.item(row, 0).text())
+        item = self.table.item(row, 0)
+        if item is None:
+            return None
+        return int(item.text())
+
+    def _emit_selected(self, *_):
+        qid = self._selected_question_id()
+        if qid is None:
+            self.status_label.setText("Select a question first.")
+            return
+        row = self.table.currentRow()
+        text_item = self.table.item(row, 2)
+        preview = text_item.text() if text_item else f"#{qid}"
+        self.questionPicked.emit(qid)
+        self.status_label.setText(f"Added: {preview}")
