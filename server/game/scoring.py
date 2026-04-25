@@ -1,23 +1,19 @@
-import math
-
 from server.config import POINTS_MAX, POINTS_MIN
+from server.scoring_curve import interpolate
 
 
 def calculate_points(elapsed_ms: int, total_ms: int) -> int:
-    """Calculate points using a square-root curve that keeps scores closer.
+    """Calculate points by sampling the instructor-configured scoring curve.
 
-    points = min_points + (max_points - min_points) * sqrt(time_remaining / total)
-
-    The curve stays high early (rewarding fast players modestly) and drops
-    more steeply only near the end, so slower players don't fall too far behind.
+    The curve maps *time remaining fraction* -> points. Defaults to the
+    original sqrt curve when no custom curve is saved.
     """
-    if elapsed_ms <= 0:
+    if total_ms <= 0 or elapsed_ms <= 0:
         return POINTS_MAX
     if elapsed_ms >= total_ms:
-        return POINTS_MIN
-
+        return max(POINTS_MIN, interpolate(0.0))
     remaining_ratio = 1 - (elapsed_ms / total_ms)
-    return max(POINTS_MIN, round(POINTS_MIN + (POINTS_MAX - POINTS_MIN) * math.sqrt(remaining_ratio)))
+    return max(POINTS_MIN, interpolate(remaining_ratio))
 
 
 def points_at_time(elapsed_ms: int, total_ms: int) -> int:

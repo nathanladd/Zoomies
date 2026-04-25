@@ -135,3 +135,19 @@ class ApiClient:
         resp = self.client.post("/api/admin/restore", json={"path": path}, timeout=60.0)
         resp.raise_for_status()
         return resp.json()
+
+    # ── Settings (scoring curve) ───────────────────────────────────────────
+
+    def get_scoring(self) -> dict[str, Any]:
+        resp = self.client.get("/api/settings/scoring")
+        resp.raise_for_status()
+        return resp.json()
+
+    def set_scoring(self, points: list[dict[str, Any]]) -> dict[str, Any]:
+        resp = self.client.put(
+            "/api/settings/scoring",
+            json={"points": points},
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        return resp.json()

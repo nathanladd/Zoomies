@@ -17,6 +17,7 @@ from instructor.core.topic_manager import TopicManager
 from instructor.core.question_pool import QuestionPool
 from instructor.core.quiz_builder import QuizBuilder
 from instructor.game.control_panel import GameControlPanel, kill_port_processes
+from instructor.ui.scoring_window import ScoringAdjustmentWindow
 from version import __version__
 
 SERVER_HOST = "127.0.0.1"
@@ -133,6 +134,7 @@ class MainWindow(QMainWindow):
 
         # Game panel is the main window's central widget
         self.game_panel = GameControlPanel(self.api, server_process=self.server_process)
+        self.game_panel.restart_server_requested.connect(self._restart_server)
         self.setCentralWidget(self.game_panel)
 
         # Dock widgets for authoring tools
@@ -295,6 +297,13 @@ class MainWindow(QMainWindow):
         restore_action.triggered.connect(self._restore_database)
         db_menu.addAction(restore_action)
 
+        # Settings menu
+        settings_menu = menubar.addMenu("&Settings")
+
+        scoring_action = QAction("&Scoring Adjustment…", self)
+        scoring_action.triggered.connect(self._open_scoring_settings)
+        settings_menu.addAction(scoring_action)
+
     def _backup_database(self):
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         default = str(Path.home() / f"zundpunkt-{stamp}.zip")
@@ -340,6 +349,29 @@ class MainWindow(QMainWindow):
             f"Restored from:\n{result.get('restored_from', path)}\n\n"
             f"Previous state: {result.get('previous_state', '?')}\n\n"
             f"{result.get('notice', '')}",
+        )
+
+    def _open_scoring_settings(self):
+        dlg = ScoringAdjustmentWindow(self.api, self)
+        dlg.exec()
+
+    def _restart_server(self):
+        """Stop the current server QProcess, then start a fresh one and
+        re-wire the game panel's console to the new process. Triggered by
+        GameControlPanel's Restart Server button."""
+        self.statusBar().showMessage("Restarting server…")
+        self._stop_server()
+        self._start_server()
+        if not _wait_for_server(SERVER_HOST, SERVER_PORT, timeout_s=15.0):
+            QMessageBox.critical(
+                self, "Server did not restart",
+                f"The server did not come back online on port {SERVER_PORT} within 15 seconds.",
+            )
+            self.statusBar().showMessage("Server restart failed")
+            return
+        self.game_panel.set_server_process(self.server_process)
+        self.statusBar().showMessage(
+            f"Server restarted at {SERVER_HOST}:{SERVER_PORT}", 5000,
         )
 
     def closeEvent(self, event):

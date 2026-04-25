@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.config import BASE_DIR, MEDIA_DIR, USER_DATA_DIR
 from server.database import init_db, get_db
-from server.routers import topics, questions, quizzes, games, admin
+from server.routers import topics, questions, quizzes, games, admin, settings
 from server.game.handlers import (
     load_engine, handle_student_ws, handle_instructor_ws,
 )
@@ -42,6 +42,7 @@ app.include_router(questions.router)
 app.include_router(quizzes.router)
 app.include_router(games.router)
 app.include_router(admin.router)
+app.include_router(settings.router)
 
 
 # ── Meta ──────────────────────────────────────────────────────────────────────────

@@ -65,6 +65,10 @@ async def create_backup(path: str | None = None) -> BackupResult:
 
         with zipfile.ZipFile(out_zip, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             zf.write(tmp_db, arcname=f"data/{DB_FILENAME}")
+            # Instructor-editable settings (scoring curve, etc.)
+            scoring_json = DATA_DIR / "scoring.json"
+            if scoring_json.is_file():
+                zf.write(scoring_json, arcname="data/scoring.json")
             if MEDIA_DIR.exists():
                 for p in MEDIA_DIR.rglob("*"):
                     if p.is_file():

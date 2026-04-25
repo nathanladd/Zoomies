@@ -147,6 +147,9 @@ class GameControlPanel(QWidget):
     # Emitted whenever the projection window's visibility changes so the
     # View menu checkmark can stay in sync.
     projection_visibility_changed = pyqtSignal(bool)
+    # Emitted when the user clicks "Restart Server" — MainWindow handles the
+    # actual stop/start since it owns the QProcess.
+    restart_server_requested = pyqtSignal()
 
     def __init__(self, api: ApiClient, server_process: QProcess | None = None):
         super().__init__()
@@ -284,6 +287,24 @@ class GameControlPanel(QWidget):
         self.server_console_group = QWidget()
         srv_layout = QVBoxLayout(self.server_console_group)
         srv_layout.setContentsMargins(0, 0, 0, 0)
+        srv_toolbar = QHBoxLayout()
+        srv_toolbar.setContentsMargins(0, 0, 0, 0)
+        self.restart_server_btn = QPushButton("Restart Server")
+        self.restart_server_btn.setToolTip(
+            "Kill and relaunch the backend server on port 5000. "
+            "Use this if API calls start returning errors mid-game."
+        )
+        self.restart_server_btn.clicked.connect(self._on_restart_server_clicked)
+        srv_toolbar.addWidget(self.restart_server_btn)
+        srv_toolbar.addStretch()
+        self.server_version_label = QLabel("Server: …")
+        self.server_version_label.setStyleSheet("color: #94a3b8; padding: 0 6px;")
+        self.server_version_label.setToolTip("Version reported by GET /api/version")
+        srv_toolbar.addWidget(self.server_version_label)
+        srv_layout.addLayout(srv_toolbar)
+        # Version label is refreshed only at startup and after a server
+        # restart (see set_server_process); no periodic polling.
+        QTimer.singleShot(800, self._refresh_server_version)
         self.server_console = QPlainTextEdit()
         self.server_console.setReadOnly(True)
         self.server_console.setMaximumBlockCount(500)
@@ -644,6 +665,52 @@ class GameControlPanel(QWidget):
 
     def _on_server_finished(self, exit_code, exit_status):
         self.server_console.appendPlainText(f"--- Server exited (code {exit_code}) ---")
+
+    def _on_restart_server_clicked(self):
+        confirm = QMessageBox.question(
+            self, "Restart Server",
+            "Kill and relaunch the backend server?\n\n"
+            "Any in-progress game state held only in server memory will be lost. "
+            "Player scores and questions in the database are not affected.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        self.server_console.appendPlainText("--- Restart requested by user ---")
+        self.restart_server_btn.setEnabled(False)
+        QTimer.singleShot(2000, lambda: self.restart_server_btn.setEnabled(True))
+        self.restart_server_requested.emit()
+
+    def _refresh_server_version(self) -> None:
+        """Poll /api/version and update the label. Runs every few seconds and
+        immediately after a restart so the user can verify they're on the
+        intended build."""
+        try:
+            import httpx
+            r = httpx.get("http://127.0.0.1:5000/api/version", timeout=1.0)
+            if r.status_code == 200:
+                v = r.json().get("version", "?")
+                self.server_version_label.setText(f"Server: v{v}")
+                self.server_version_label.setStyleSheet("color: #34d399; padding: 0 6px;")
+                return
+        except Exception:
+            pass
+        self.server_version_label.setText("Server: offline")
+        self.server_version_label.setStyleSheet("color: #f87171; padding: 0 6px;")
+
+    def set_server_process(self, proc: QProcess | None) -> None:
+        """Swap in a new server QProcess after MainWindow restarts it.
+
+        Re-wires log piping and the exit-notification slot so the console
+        keeps working across restarts.
+        """
+        self._server_process = proc
+        if proc is not None:
+            proc.readyReadStandardOutput.connect(self._read_server_output)
+            proc.finished.connect(self._on_server_finished)
+            self.server_console.appendPlainText("--- Server running ---")
+        QTimer.singleShot(800, self._refresh_server_version)
 
     def closeEvent(self, event):
         # Restore stdout
