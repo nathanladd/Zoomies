@@ -146,6 +146,9 @@ class GameEngine(BaseGame):
         self.current_index = -1
         self.current_question: QuestionState | None = None
         self.status = "waiting"  # waiting / active / revealing / finished
+        # Set by handlers when a per-question timer task is running so the
+        # student handler can cancel it on early all-answered reveal.
+        self.timer_task: Any = None
 
     async def on_player_join(self, player_id: int, name: str) -> dict[str, Any]:
         self.players[player_id] = {"name": name, "score": 0}

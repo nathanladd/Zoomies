@@ -163,6 +163,11 @@ async def handle_student_ws(ws: WebSocket, game_id: int) -> None:
                         "is_correct": bool(result.get("is_correct", False)),
                     })
 
+                    # If every player has answered, reveal early instead of
+                    # waiting for the timer to expire.
+                    if total > 0 and answered >= total and engine.status == "active":
+                        await _reveal_and_broadcast(game_id, engine)
+
                 else:
                     await manager.send_to_student(game_id, player_id, {
                         "type": "error",
@@ -269,15 +274,10 @@ async def handle_instructor_ws(ws: WebSocket, game_id: int) -> None:
                     timer_task = asyncio.create_task(
                         _question_timer_loop(game_id, engine)
                     )
+                    engine.timer_task = timer_task
 
             elif msg_type == "reveal":
-                if timer_task and not timer_task.done():
-                    timer_task.cancel()
-                reveal_info = await engine.on_reveal()
-                await manager.broadcast_to_all(game_id, {
-                    "type": "question_end",
-                    **reveal_info,
-                })
+                await _reveal_and_broadcast(game_id, engine)
 
             elif msg_type == "end_game":
                 if timer_task and not timer_task.done():
@@ -338,11 +338,27 @@ async def _question_timer_loop(game_id: int, engine: GameEngine) -> None:
 
         # Time expired — auto-reveal
         if engine.current_question and engine.status == "active":
-            reveal_info = await engine.on_reveal()
-            await manager.broadcast_to_all(game_id, {
-                "type": "question_end",
-                **reveal_info,
-            })
+            await _reveal_and_broadcast(game_id, engine)
 
     except asyncio.CancelledError:
         pass
+
+
+async def _reveal_and_broadcast(game_id: int, engine: GameEngine) -> None:
+    """Cancel the running per-question timer (if any) and broadcast the reveal.
+
+    Idempotent: only fires when the engine is still in the ``active`` state, so
+    early all-answered reveal, the instructor reveal button, and timer expiry
+    can all call this safely without double-broadcasting.
+    """
+    if engine.status != "active":
+        return
+    timer_task = getattr(engine, "timer_task", None)
+    if timer_task is not None and not timer_task.done():
+        timer_task.cancel()
+    engine.timer_task = None
+    reveal_info = await engine.on_reveal()
+    await manager.broadcast_to_all(game_id, {
+        "type": "question_end",
+        **reveal_info,
+    })
