@@ -168,3 +168,17 @@ class ApiClient:
         )
         resp.raise_for_status()
         return resp.json()
+
+    def get_elimination(self) -> dict[str, Any]:
+        resp = self.client.get("/api/settings/elimination")
+        resp.raise_for_status()
+        return resp.json()
+
+    def set_elimination(self, marks: list[float]) -> dict[str, Any]:
+        resp = self.client.put(
+            "/api/settings/elimination",
+            json={"marks": marks},
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        return resp.json()

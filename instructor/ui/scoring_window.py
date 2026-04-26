@@ -12,7 +12,7 @@ from __future__ import annotations
 import math
 
 from PyQt6.QtCore import Qt, QPointF, QRectF
-from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPainterPath, QPen
+from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPainterPath, QPen, QPolygonF
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget,
 )
@@ -20,13 +20,15 @@ from PyQt6.QtWidgets import (
 
 POINTS_MAX = 1000
 HANDLE_R = 8
-MARGIN_L, MARGIN_R, MARGIN_T, MARGIN_B = 70, 20, 24, 48
+MARGIN_L, MARGIN_R, MARGIN_T, MARGIN_B = 70, 28, 28, 48
 
-# Elimination marks are expressed in the engine as fraction of time *elapsed*
-# (server/config.py: ELIMINATION_MARKS = (0.33, 0.66)). The chart's X axis is
-# fraction of time *remaining*, so we flip them: 1 - elapsed.
-ELIMINATION_ELAPSED = (0.33, 0.66)
+# Elimination marks are expressed in the engine as fraction of time *elapsed*.
+# The chart's X axis is fraction of time *remaining*, so we flip them: 1 - elapsed.
+DEFAULT_ELIMINATION_ELAPSED = (0.33, 0.66)
 ELIMINATION_LABELS = ("1st wrong answer removed", "2nd wrong answer removed")
+ELIM_MIN, ELIM_MAX = 0.02, 0.98
+ELIM_MIN_GAP = 0.02
+ELIM_GRAB_PX = 6
 
 
 class CurveEditor(QWidget):
@@ -38,6 +40,10 @@ class CurveEditor(QWidget):
         self.setMouseTracking(True)
         self._pts: list[list[float]] = []  # [[t, points], ...]
         self._drag_idx: int | None = None
+        # Elimination marks stored as fraction of time *elapsed* (engine units),
+        # always sorted ascending. Two values: 1st-wrong, 2nd-wrong.
+        self._elim: list[float] = list(DEFAULT_ELIMINATION_ELAPSED)
+        self._elim_drag: int | None = None
 
     # ── data ────────────────────────────────────────────────────────────
 
@@ -48,6 +54,15 @@ class CurveEditor(QWidget):
 
     def get_points(self) -> list[tuple[float, int]]:
         return [(t, int(round(p))) for t, p in self._pts]
+
+    def set_elimination_marks(self, marks: list[float] | tuple[float, ...]) -> None:
+        vals = sorted(max(ELIM_MIN, min(ELIM_MAX, float(m))) for m in marks)
+        if len(vals) >= 2:
+            self._elim = [vals[0], vals[1]]
+        self.update()
+
+    def get_elimination_marks(self) -> list[float]:
+        return list(self._elim)
 
     # ── coord transforms ────────────────────────────────────────────────
 
@@ -115,21 +130,47 @@ class CurveEditor(QWidget):
         p.drawText(0, 0, "Points awarded")
         p.restore()
 
-        # Elimination markers — vertical dashed lines showing where wrong
-        # answers get removed during a question. Drawn before the curve so the
-        # curve and handles render on top.
-        elim_pen = QPen(QColor("#f87171"), 1.4, Qt.PenStyle.DashLine)
+        # Elimination markers — draggable vertical sliders showing where wrong
+        # answers get removed. Drawn before the curve so handles render on top.
         elim_label_font = QFont("Segoe UI", 8, QFont.Weight.Bold)
-        for elapsed, label in zip(ELIMINATION_ELAPSED, ELIMINATION_LABELS):
+        for i, (elapsed, label) in enumerate(zip(self._elim, ELIMINATION_LABELS)):
             t = 1.0 - elapsed  # convert to "time remaining" axis
             x = r.left() + t * r.width()
-            p.setPen(elim_pen)
+            active = (i == self._elim_drag)
+            line_color = QColor("#fbbf24") if active else QColor("#f87171")
+            p.setPen(QPen(line_color, 1.6 if active else 1.4, Qt.PenStyle.DashLine))
             p.drawLine(QPointF(x, r.top()), QPointF(x, r.bottom()))
+
+            # Triangular grip handles at top and bottom of the line.
+            grip = QColor("#fbbf24") if active else QColor("#f87171")
+            p.setPen(QPen(QColor("#0f172a"), 1))
+            p.setBrush(QBrush(grip))
+            top_tri = QPolygonF([
+                QPointF(x - 6, r.top() - 2),
+                QPointF(x + 6, r.top() - 2),
+                QPointF(x, r.top() + 6),
+            ])
+            bot_tri = QPolygonF([
+                QPointF(x - 6, r.bottom() + 2),
+                QPointF(x + 6, r.bottom() + 2),
+                QPointF(x, r.bottom() - 6),
+            ])
+            p.drawPolygon(top_tri)
+            p.drawPolygon(bot_tri)
+
+            # Percentage readout above the top grip.
             p.setFont(elim_label_font)
-            p.setPen(QColor("#fca5a5"))
-            # Rotated label running up the line so it doesn't fight the curve.
+            p.setPen(QColor("#fde68a") if active else QColor("#fca5a5"))
+            pct = f"{int(round(elapsed * 100))}%"
+            fm = p.fontMetrics()
+            tw = fm.horizontalAdvance(pct)
+            tx = x - tw / 2
+            tx = max(r.left() + 2, min(r.right() - tw - 2, tx))
+            p.drawText(QPointF(tx, r.top() - 8), pct)
+
+            # Rotated descriptive label running up the line.
             p.save()
-            p.translate(x - 4, r.bottom() - 6)
+            p.translate(x - 4, r.bottom() - 14)
             p.rotate(-90)
             p.drawText(0, 0, label)
             p.restore()
@@ -137,11 +178,13 @@ class CurveEditor(QWidget):
         if not self._pts:
             return
 
-        # Curve
+        # Curve — stroke only; explicitly clear the brush so drawPath doesn't
+        # fill the closed polygon underneath the line.
         path = QPainterPath(self._to_px(*self._pts[0]))
         for t, pts in self._pts[1:]:
             path.lineTo(self._to_px(t, pts))
         p.setPen(QPen(QColor("#6366f1"), 3))
+        p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawPath(path)
 
         # Handles + value labels
@@ -176,34 +219,80 @@ class CurveEditor(QWidget):
                 return i
         return None
 
+    def _hit_elim(self, pos: QPointF) -> int | None:
+        r = self._plot_rect()
+        # Allow grabbing slightly outside the plot rect for the triangle grips.
+        if pos.y() < r.top() - 10 or pos.y() > r.bottom() + 10:
+            return None
+        best_i, best_dx = None, ELIM_GRAB_PX + 1
+        for i, elapsed in enumerate(self._elim):
+            x = r.left() + (1.0 - elapsed) * r.width()
+            dx = abs(pos.x() - x)
+            if dx <= best_dx:
+                best_dx = dx
+                best_i = i
+        return best_i
+
     def mousePressEvent(self, ev):
-        if ev.button() == Qt.MouseButton.LeftButton:
-            self._drag_idx = self._hit(ev.position())
+        if ev.button() != Qt.MouseButton.LeftButton:
+            return
+        # Curve handles take priority over elimination sliders.
+        idx = self._hit(ev.position())
+        if idx is not None:
+            self._drag_idx = idx
+            self.update()
+            return
+        eidx = self._hit_elim(ev.position())
+        if eidx is not None:
+            self._elim_drag = eidx
             self.update()
 
     def mouseMoveEvent(self, ev):
-        if self._drag_idx is None:
-            if self._hit(ev.position()) is not None:
-                self.setCursor(Qt.CursorShape.OpenHandCursor)
+        if self._drag_idx is not None:
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            t, pts = self._from_px(ev.position())
+            if self._drag_idx == 0:
+                t = 0.0
+            elif self._drag_idx == len(self._pts) - 1:
+                t = 1.0
             else:
-                self.unsetCursor()
+                lo = self._pts[self._drag_idx - 1][0] + 0.01
+                hi = self._pts[self._drag_idx + 1][0] - 0.01
+                t = max(lo, min(hi, t))
+            self._pts[self._drag_idx] = [t, pts]
+            self.update()
             return
-        self.setCursor(Qt.CursorShape.ClosedHandCursor)
-        t, pts = self._from_px(ev.position())
-        # Endpoints stay pinned on X; interior points can't cross neighbors.
-        if self._drag_idx == 0:
-            t = 0.0
-        elif self._drag_idx == len(self._pts) - 1:
-            t = 1.0
+
+        if self._elim_drag is not None:
+            self.setCursor(Qt.CursorShape.SplitHCursor)
+            r = self._plot_rect()
+            t_remaining = (ev.position().x() - r.left()) / r.width() if r.width() else 0
+            t_remaining = max(0.0, min(1.0, t_remaining))
+            elapsed = 1.0 - t_remaining
+            i = self._elim_drag
+            other = self._elim[1 - i]
+            if i == 0:
+                # 1st mark must stay strictly less than 2nd.
+                hi = other - ELIM_MIN_GAP
+                elapsed = max(ELIM_MIN, min(hi, elapsed))
+            else:
+                lo = other + ELIM_MIN_GAP
+                elapsed = max(lo, min(ELIM_MAX, elapsed))
+            self._elim[i] = elapsed
+            self.update()
+            return
+
+        # Idle hover — update cursor based on what's under the mouse.
+        if self._hit(ev.position()) is not None:
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
+        elif self._hit_elim(ev.position()) is not None:
+            self.setCursor(Qt.CursorShape.SplitHCursor)
         else:
-            lo = self._pts[self._drag_idx - 1][0] + 0.01
-            hi = self._pts[self._drag_idx + 1][0] - 0.01
-            t = max(lo, min(hi, t))
-        self._pts[self._drag_idx] = [t, pts]
-        self.update()
+            self.unsetCursor()
 
     def mouseReleaseEvent(self, _ev):
         self._drag_idx = None
+        self._elim_drag = None
         self.unsetCursor()
         self.update()
 
@@ -219,7 +308,9 @@ class ScoringAdjustmentWindow(QDialog):
             "Drag the green handles to reshape how points are awarded. "
             "X = fraction of question time remaining when the student answered "
             "(100% = instant, 0% = buzzer). Y = points awarded. "
-            "A flatter line keeps scores closer together."
+            "A flatter line keeps scores closer together. "
+            "Drag the red dashed sliders to set when wrong answers are removed; "
+            "they cannot cross each other."
         )
         self.hint.setStyleSheet("color: #94a3b8;")
         self.hint.setWordWrap(True)
@@ -261,9 +352,22 @@ class ScoringAdjustmentWindow(QDialog):
             self.editor.set_points([(p["t"], p["points"]) for p in data["points"]])
         except Exception as e:
             QMessageBox.warning(self, "Load failed", f"Could not load scoring curve:\n{e}")
-            self._load_default()
+            self._load_default_curve()
+        try:
+            elim = self.api.get_elimination()
+            self.editor.set_elimination_marks(elim["marks"])
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Load failed",
+                f"Could not load elimination marks:\n{e}",
+            )
+            self.editor.set_elimination_marks([0.33, 0.66])
 
     def _load_default(self):
+        self._load_default_curve()
+        self.editor.set_elimination_marks([0.33, 0.66])
+
+    def _load_default_curve(self):
         pts = [(t, round(100 + 900 * math.sqrt(t))) for t in (0, 0.25, 0.5, 0.75, 1.0)]
         self.editor.set_points(pts)
 
@@ -281,10 +385,12 @@ class ScoringAdjustmentWindow(QDialog):
         payload = [{"t": t, "points": p} for t, p in self.editor.get_points()]
         try:
             self.api.set_scoring(payload)
+            self.api.set_elimination(self.editor.get_elimination_marks())
         except Exception as e:
             QMessageBox.warning(self, "Save failed", str(e))
             return
         QMessageBox.information(
             self, "Saved",
-            "Scoring curve saved. Applies to the next question (no restart needed).",
+            "Scoring curve and elimination timing saved. "
+            "Applies to the next question (no restart needed).",
         )

@@ -2,7 +2,8 @@ import random
 import time
 from typing import Any
 
-from server.config import POINTS_MAX, POINTS_MIN, ELIMINATION_MARKS
+from server.config import POINTS_MAX, POINTS_MIN
+from server.elimination_marks import load_marks
 from server.game.base import BaseGame
 from server.game.scoring import calculate_points
 from server.game.elimination import build_elimination_schedule, get_elimination_at_mark
@@ -69,7 +70,7 @@ class QuestionState:
         if self.question_type == "true_false":
             return None
         progress = self.elapsed_ms / self.total_ms if self.total_ms > 0 else 0
-        for i, mark in enumerate(ELIMINATION_MARKS):
+        for i, mark in enumerate(load_marks()):
             if progress >= mark and self.eliminations_fired <= i:
                 choice = get_elimination_at_mark(self.elimination_schedule, i)
                 if choice and choice not in self.eliminated:
