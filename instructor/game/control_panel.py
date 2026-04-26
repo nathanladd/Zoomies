@@ -270,6 +270,14 @@ class GameControlPanel(QWidget):
         self.qa_choices_layout = QVBoxLayout()
         qa_layout.addLayout(self.qa_choices_layout)
         self._qa_choice_labels: list[QLabel] = []
+        self._qa_stat_labels: list[QLabel] = []
+        # Cumulative pick-rate row, refreshed on question_start and question_end.
+        self.qa_stats_summary = QLabel("")
+        self.qa_stats_summary.setStyleSheet("color: #94a3b8; font-size: 11px; padding: 2px 4px;")
+        qa_layout.addWidget(self.qa_stats_summary)
+        # question_id of the question currently shown in the panel; used to
+        # decide which stats payload to apply when refreshes return.
+        self._current_question_id: int | None = None
         layout.addWidget(qa_group)
 
         # ── Dockable panels (built here, docked by MainWindow) ────────────
@@ -484,6 +492,10 @@ class GameControlPanel(QWidget):
             self._answer_status.clear()
             self._refresh_answer_column()
             self._show_question(msg)
+            qid = msg.get("question_id")
+            self._current_question_id = int(qid) if qid is not None else None
+            # Defer the HTTP fetch so the UI repaints first.
+            QTimer.singleShot(0, lambda q=self._current_question_id: self._load_question_stats(q))
             if self.projection_window:
                 self.projection_window.on_question_start(msg)
 
@@ -518,6 +530,8 @@ class GameControlPanel(QWidget):
             self.btn_next.setEnabled(True)
             self.time_label.setText("Time: -")
             self._update_leaderboard(msg.get("player_scores", []))
+            # Refresh the cumulative pick rates so this round's answers show.
+            QTimer.singleShot(0, lambda q=self._current_question_id: self._load_question_stats(q))
             if self.projection_window:
                 self.projection_window.on_question_end(msg)
 
@@ -603,17 +617,81 @@ class GameControlPanel(QWidget):
 
     def _show_question(self, msg: dict):
         self.qa_question_label.setText(msg.get("text", ""))
-        # Clear old choice labels
-        for lbl in self._qa_choice_labels:
-            self.qa_choices_layout.removeWidget(lbl)
-            lbl.deleteLater()
-        self._qa_choice_labels.clear()
-        # Add new choice labels
+        # Clear old choice + stat labels
+        self._clear_choice_rows()
+        # Add new choice labels with a paired stat label on the right
         for choice in msg.get("choices", []):
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
             lbl = QLabel(f"  {choice}")
             lbl.setStyleSheet("font-size: 13px; padding: 2px 8px; border-radius: 4px;")
-            self.qa_choices_layout.addWidget(lbl)
+            stat = QLabel("")
+            stat.setStyleSheet("color: #94a3b8; font-size: 12px; padding: 2px 8px;")
+            stat.setMinimumWidth(80)
+            stat.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            row.addWidget(lbl, 1)
+            row.addWidget(stat)
+            container = QWidget()
+            container.setLayout(row)
+            self.qa_choices_layout.addWidget(container)
             self._qa_choice_labels.append(lbl)
+            self._qa_stat_labels.append(stat)
+        self.qa_stats_summary.setText("")
+
+    def _clear_choice_rows(self):
+        """Remove all choice/stat rows from qa_choices_layout."""
+        while self.qa_choices_layout.count():
+            item = self.qa_choices_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        self._qa_choice_labels.clear()
+        self._qa_stat_labels.clear()
+
+    @staticmethod
+    def _strip_choice_label(text: str) -> str:
+        text = text.strip()
+        if len(text) > 3 and text[0] in "ABCD" and text[1:3] == ") ":
+            return text[3:]
+        return text
+
+    def _load_question_stats(self, question_id: int | None):
+        """Fetch cumulative pick rates for the active question and refresh the
+        per-choice stat labels. Best-effort — logs and bails on any error."""
+        if question_id is None:
+            return
+        # Snapshot of which question we're populating so a slow response
+        # for an old question doesn't overwrite a newly-shown one.
+        target = question_id
+        try:
+            stats = self.api.get_question_stats(question_id)
+        except Exception as e:
+            print(f"[INSTR] question stats unavailable: {e}")
+            return
+        if self._current_question_id != target:
+            return
+        counts = stats.get("counts", {}) or {}
+        percentages = stats.get("percentages", {}) or {}
+        total = int(stats.get("total", 0) or 0)
+        for lbl, stat in zip(self._qa_choice_labels, self._qa_stat_labels):
+            key = self._strip_choice_label(lbl.text())
+            count = int(counts.get(key, 0) or 0)
+            pct = float(percentages.get(key, 0.0) or 0.0)
+            if total == 0:
+                stat.setText("—")
+            else:
+                stat.setText(f"{pct:.0f}% ({count})")
+        non_responses = int(stats.get("non_responses", 0) or 0)
+        non_pct = float(stats.get("non_response_percentage", 0.0) or 0.0)
+        if total == 0:
+            self.qa_stats_summary.setText("No prior responses recorded for this question.")
+        else:
+            parts = [
+                "Cumulative pick rate across all sessions",
+                f"total: {total}",
+                f"no response: {non_responses} ({non_pct:.0f}%)",
+            ]
+            self.qa_stats_summary.setText("  ·  ".join(parts))
 
     def _highlight_correct(self, correct: str):
         for lbl in self._qa_choice_labels:
@@ -626,10 +704,9 @@ class GameControlPanel(QWidget):
 
     def _clear_question(self):
         self.qa_question_label.setText("")
-        for lbl in self._qa_choice_labels:
-            self.qa_choices_layout.removeWidget(lbl)
-            lbl.deleteLater()
-        self._qa_choice_labels.clear()
+        self._clear_choice_rows()
+        self.qa_stats_summary.setText("")
+        self._current_question_id = None
 
     def _update_leaderboard_from_players(self):
         """Show all joined players with score 0, sorted by name."""

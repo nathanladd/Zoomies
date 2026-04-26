@@ -77,6 +77,15 @@ class ApiClient:
     def delete_image(self, question_id: int) -> None:
         self.client.delete(f"/api/questions/{question_id}/image")
 
+    def get_question_stats(self, question_id: int) -> dict[str, Any]:
+        resp = self.client.get(f"/api/questions/{question_id}/stats")
+        _raise_for_status(resp)
+        return resp.json()
+
+    def reset_question_stats(self, question_id: int) -> None:
+        resp = self.client.delete(f"/api/questions/{question_id}/stats")
+        _raise_for_status(resp)
+
     # ── Quizzes ────────────────────────────────────────────────────────────
 
     def list_quizzes(self) -> list[dict[str, Any]]:

@@ -191,6 +191,7 @@ class GameEngine(BaseGame):
         return {
             "index": self.current_index,
             "total": self.question_count,
+            "question_id": qdata["id"],
             "text": qdata["text"],
             "image_url": f"/media/questions/{qdata['image_filename']}" if qdata.get("image_filename") else None,
             "choices": choices,

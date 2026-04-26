@@ -8,12 +8,51 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.database import async_session
-from server.models import Game, Quiz, QuizQuestion, Player
+from server.models import Game, Quiz, QuizQuestion, Player, QuestionAnswerStat
 from server.game.engine import GameEngine
 from server.websocket.manager import manager
 
 # Active game engines: game_id -> GameEngine
 active_games: dict[int, GameEngine] = {}
+
+
+# Sentinel answer_text used in question_answer_stats to record a player who
+# was shown the question but never picked any choice before time expired.
+NO_RESPONSE_KEY = "__no_response__"
+
+
+def _stat_key(text: str) -> str:
+    """Strip the leading "X) " label from a display choice so the saved stat
+    matches the raw answer text shown in the question editor."""
+    if not text:
+        return text
+    if len(text) > 3 and text[0] in "ABCD" and text[1:3] == ") ":
+        return text[3:]
+    return text
+
+
+async def _record_answer_stat(question_id: int, answer_text: str, delta: int = 1) -> None:
+    """Increment the cumulative tally for (question_id, answer_text) by ``delta``."""
+    if not answer_text or delta <= 0:
+        return
+    async with async_session() as db:
+        stmt = select(QuestionAnswerStat).where(
+            QuestionAnswerStat.question_id == question_id,
+            QuestionAnswerStat.answer_text == answer_text,
+        )
+        existing = (await db.execute(stmt)).scalar_one_or_none()
+        if existing:
+            existing.times_chosen += delta
+        else:
+            db.add(QuestionAnswerStat(
+                question_id=question_id,
+                answer_text=answer_text,
+                times_chosen=delta,
+            ))
+        try:
+            await db.commit()
+        except Exception:
+            await db.rollback()
 
 
 async def load_engine(game_id: int, db: AsyncSession) -> GameEngine:
@@ -164,6 +203,15 @@ async def handle_student_ws(ws: WebSocket, game_id: int) -> None:
                         "name": engine.players[player_id]["name"],
                         "is_correct": bool(result.get("is_correct", False)),
                     })
+
+                    # Persist a cumulative tally of how often this answer
+                    # text has been chosen for this question across all games.
+                    q_state = engine.current_question
+                    if q_state is not None:
+                        await _record_answer_stat(
+                            q_state.question_id,
+                            _stat_key(result.get("choice", "")),
+                        )
 
                     # If every player has answered, reveal early instead of
                     # waiting for the timer to expire.
@@ -359,8 +407,31 @@ async def _reveal_and_broadcast(game_id: int, engine: GameEngine) -> None:
     if timer_task is not None and not timer_task.done():
         timer_task.cancel()
     engine.timer_task = None
+
+    # Snapshot the question + per-player answer dict before on_reveal flips
+    # state, so we can record one "no response" per player who never picked.
+    q_state = engine.current_question
+    no_response_count = 0
+    no_response_qid: int | None = None
+    if q_state is not None:
+        no_response_qid = q_state.question_id
+        no_response_count = max(0, len(engine.players) - len(q_state.answers))
+
     reveal_info = await engine.on_reveal()
+
     await manager.broadcast_to_all(game_id, {
         "type": "question_end",
         **reveal_info,
     })
+
+    # Persist the no-response tally as a fire-and-forget background task.
+    # We must NOT await this here: when this function is invoked from inside
+    # the per-question timer loop (the natural-expiry path), the loop has
+    # just been told to cancel itself a few lines above. Any extra awaited
+    # IO before the broadcast would let that pending CancelledError fire
+    # mid-flight and the question_end message would never reach the clients,
+    # which manifests as the timer freezing at the last tick.
+    if no_response_qid is not None and no_response_count > 0:
+        asyncio.create_task(
+            _record_answer_stat(no_response_qid, NO_RESPONSE_KEY, no_response_count)
+        )

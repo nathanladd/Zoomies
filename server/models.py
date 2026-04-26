@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Boolean, DateTime, ForeignKey, Integer, String, Text,
+    Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -103,3 +103,19 @@ class Player(Base):
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     game: Mapped[Game] = relationship(back_populates="players", lazy="selectin")
+
+
+class QuestionAnswerStat(Base):
+    """Cumulative tally of how often each answer text has been chosen for a question."""
+
+    __tablename__ = "question_answer_stats"
+    __table_args__ = (
+        UniqueConstraint("question_id", "answer_text", name="uq_question_answer"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    question_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    answer_text: Mapped[str] = mapped_column(String, nullable=False)
+    times_chosen: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

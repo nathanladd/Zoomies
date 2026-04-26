@@ -202,6 +202,7 @@ class QuestionDialog(QDialog):
         self.mc_group = QButtonGroup(self)
         self.mc_radios: dict[str, QRadioButton] = {}
         self.mc_inputs: dict[str, QLineEdit] = {}
+        self.mc_stats: dict[str, QLabel] = {}
         mc_container = QWidget()
         mc_layout = QVBoxLayout(mc_container)
         mc_layout.setContentsMargins(0, 0, 0, 0)
@@ -216,11 +217,17 @@ class QuestionDialog(QDialog):
                 le.setPlaceholderText(f"Answer {letter}")
             else:
                 le.setPlaceholderText(f"Answer {letter} (optional)")
+            stat = QLabel("")
+            stat.setMinimumWidth(70)
+            stat.setStyleSheet("color: #555; font-size: 11px;")
+            stat.setToolTip("Cumulative pick rate across all played sessions")
             self.mc_group.addButton(rb)
             self.mc_radios[letter] = rb
             self.mc_inputs[letter] = le
+            self.mc_stats[letter] = stat
             row.addWidget(rb)
             row.addWidget(le, 1)
+            row.addWidget(stat)
             row_widget = QWidget()
             row_widget.setLayout(row)
             mc_layout.addWidget(row_widget)
@@ -229,19 +236,32 @@ class QuestionDialog(QDialog):
         self._row_mc = layout.rowCount() - 1
 
         # True/False radio row — only shown when question_type == "true_false"
-        tf_row = QHBoxLayout()
         self.tf_true = QRadioButton("True")
         self.tf_false = QRadioButton("False")
         self.tf_group = QButtonGroup(self)
         self.tf_group.addButton(self.tf_true)
         self.tf_group.addButton(self.tf_false)
         self.tf_true.setChecked(True)
-        tf_row.addWidget(self.tf_true)
-        tf_row.addWidget(self.tf_false)
-        tf_row.addStretch()
-        tf_widget = QWidget()
-        tf_widget.setLayout(tf_row)
-        layout.addRow("Answer:", tf_widget)
+        self.tf_stat_true = QLabel("")
+        self.tf_stat_false = QLabel("")
+        for s in (self.tf_stat_true, self.tf_stat_false):
+            s.setStyleSheet("color: #555; font-size: 11px;")
+            s.setMinimumWidth(70)
+            s.setToolTip("Cumulative pick rate across all played sessions")
+        tf_container = QWidget()
+        tf_layout = QVBoxLayout(tf_container)
+        tf_layout.setContentsMargins(0, 0, 0, 0)
+        tf_layout.setSpacing(2)
+        for rb, stat in ((self.tf_true, self.tf_stat_true), (self.tf_false, self.tf_stat_false)):
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            row.addWidget(rb)
+            row.addStretch()
+            row.addWidget(stat)
+            rw = QWidget()
+            rw.setLayout(row)
+            tf_layout.addWidget(rw)
+        layout.addRow("Answer:", tf_container)
         self._row_tf = layout.rowCount() - 1
 
         # Technician A/B radio rows — only shown when question_type == "technician_ab".
@@ -254,18 +274,47 @@ class QuestionDialog(QDialog):
         ]
         self.ab_group = QButtonGroup(self)
         self.ab_radios: dict[str, QRadioButton] = {}
+        self.ab_stats: dict[str, QLabel] = {}
         ab_container = QWidget()
         ab_layout = QVBoxLayout(ab_container)
         ab_layout.setContentsMargins(0, 0, 0, 0)
         ab_layout.setSpacing(2)
         for letter, text in self.ab_choices:
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
             rb = QRadioButton(f"{letter}. {text}")
             self.ab_group.addButton(rb)
             self.ab_radios[letter] = rb
-            ab_layout.addWidget(rb)
+            stat = QLabel("")
+            stat.setStyleSheet("color: #555; font-size: 11px;")
+            stat.setMinimumWidth(70)
+            stat.setToolTip("Cumulative pick rate across all played sessions")
+            self.ab_stats[letter] = stat
+            row.addWidget(rb, 1)
+            row.addWidget(stat)
+            rw = QWidget()
+            rw.setLayout(row)
+            ab_layout.addWidget(rw)
         self.ab_radios["A"].setChecked(True)
         layout.addRow("Answers:", ab_container)
         self._row_ab = layout.rowCount() - 1
+
+        # Cumulative answer-stats summary, sits below the answers so the
+        # per-row pick-rate labels and the totals appear together. Populated
+        # by `_load_stats` after the dialog finishes building; hidden entirely
+        # when adding a new question.
+        stats_row = QHBoxLayout()
+        self.stats_summary = QLabel("")
+        self.stats_summary.setStyleSheet("color: #555; font-size: 11px;")
+        self.btn_reset_stats = QPushButton("Reset stats")
+        self.btn_reset_stats.setVisible(False)
+        self.btn_reset_stats.clicked.connect(self._reset_stats)
+        stats_row.addWidget(self.stats_summary, 1)
+        stats_row.addWidget(self.btn_reset_stats)
+        stats_widget = QWidget()
+        stats_widget.setLayout(stats_row)
+        layout.addRow("Stats:", stats_widget)
+        self._row_stats = layout.rowCount() - 1
 
         self._form_layout = layout
 
@@ -347,6 +396,13 @@ class QuestionDialog(QDialog):
                 self.ab_radios[letter].setChecked(True)
 
         self._on_type_changed(self.type_combo.currentText())
+
+        # Stats only make sense for existing questions. Hide the row otherwise
+        # and load the cumulative tally for the current question.
+        if question and question.get("id") is not None:
+            self._load_stats()
+        else:
+            self._set_row_visible(self._row_stats, False)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -487,6 +543,80 @@ class QuestionDialog(QDialog):
 
     def should_remove_image(self) -> bool:
         return self._remove_image
+
+    # ── Cumulative answer stats ────────────────────────────────────────
+    def _load_stats(self):
+        """Fetch cumulative pick rates for this question and refresh labels."""
+        if not self.question:
+            return
+        qid = self.question.get("id")
+        if qid is None:
+            return
+        try:
+            stats = self.api.get_question_stats(int(qid))
+        except Exception as e:
+            self.stats_summary.setText(f"(stats unavailable: {e})")
+            self.btn_reset_stats.setVisible(False)
+            return
+        self._stats_cache = stats
+        total = int(stats.get("total", 0) or 0)
+        non_responses = int(stats.get("non_responses", 0) or 0)
+        non_pct = float(stats.get("non_response_percentage", 0.0) or 0.0)
+        if total == 0:
+            self.stats_summary.setText("No answers recorded yet.")
+        else:
+            self.stats_summary.setText(
+                f"Total: {total}  ·  no response: {non_responses} ({non_pct:.0f}%)"
+            )
+        self.btn_reset_stats.setVisible(total > 0)
+        self._apply_stats(stats)
+
+    def _format_pct(self, pct: float, count: int) -> str:
+        return f"{pct:.0f}% ({count})"
+
+    def _apply_stats(self, stats: dict):
+        counts = stats.get("counts", {}) or {}
+        percentages = stats.get("percentages", {}) or {}
+
+        def lookup(text: str) -> str:
+            text = (text or "").strip()
+            if not text:
+                return ""
+            count = int(counts.get(text, 0) or 0)
+            pct = float(percentages.get(text, 0.0) or 0.0)
+            return self._format_pct(pct, count)
+
+        # Multiple-choice: each slot has free-form text we can match directly.
+        for letter, le in self.mc_inputs.items():
+            self.mc_stats[letter].setText(lookup(le.text()))
+
+        # True/False: stored under literal strings "True" / "False".
+        self.tf_stat_true.setText(lookup("True"))
+        self.tf_stat_false.setText(lookup("False"))
+
+        # Technician A/B: stored under the full phrase (label prefix stripped).
+        for letter, phrase in self.ab_choices:
+            self.ab_stats[letter].setText(lookup(phrase))
+
+    def _reset_stats(self):
+        if not self.question:
+            return
+        qid = self.question.get("id")
+        if qid is None:
+            return
+        confirm = QMessageBox.question(
+            self, "Reset stats",
+            "Clear the cumulative answer-pick tally for this question?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.api.reset_question_stats(int(qid))
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to reset stats: {e}")
+            return
+        self._load_stats()
 
 
 class QuestionPool(QWidget):

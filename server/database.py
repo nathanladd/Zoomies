@@ -32,7 +32,7 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         from server.models import (  # noqa: F401
             Topic, Question, Quiz, QuizQuestion,
-            Game, Player,
+            Game, Player, QuestionAnswerStat,
         )
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_run_lightweight_migrations)

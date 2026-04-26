@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.config import MEDIA_DIR, ALLOWED_IMAGE_EXTENSIONS, MAX_IMAGE_SIZE
 from server.database import get_db
-from server.models import Question
+from server.models import Question, QuestionAnswerStat
 from server.schemas import QuestionCreate, QuestionUpdate, QuestionRead
 
 router = APIRouter(prefix="/api/questions", tags=["questions"])
@@ -44,6 +44,60 @@ async def get_question(question_id: int, db: AsyncSession = Depends(get_db)):
     if not q:
         raise HTTPException(404, "Question not found")
     return _question_to_read(q)
+
+
+NO_RESPONSE_KEY = "__no_response__"
+
+
+@router.get("/{question_id}/stats")
+async def get_question_stats(question_id: int, db: AsyncSession = Depends(get_db)):
+    """Cumulative answer-pick tally + percentages for a single question.
+
+    The total includes players who saw the question but never picked any
+    choice (recorded under the ``NO_RESPONSE_KEY`` sentinel). Per-choice
+    percentages are computed against this grand total so non-responses are
+    correctly reflected as a missing share."""
+    q = await db.get(Question, question_id)
+    if not q:
+        raise HTTPException(404, "Question not found")
+
+    rows = (await db.execute(
+        select(QuestionAnswerStat).where(QuestionAnswerStat.question_id == question_id)
+    )).scalars().all()
+
+    raw = {r.answer_text: r.times_chosen for r in rows}
+    non_responses = int(raw.pop(NO_RESPONSE_KEY, 0) or 0)
+    counts = raw
+    total_responses = sum(counts.values())
+    total = total_responses + non_responses
+    percentages = {
+        text: (count * 100.0 / total) if total else 0.0
+        for text, count in counts.items()
+    }
+    non_response_pct = (non_responses * 100.0 / total) if total else 0.0
+    return {
+        "question_id": question_id,
+        "total": total,
+        "total_responses": total_responses,
+        "non_responses": non_responses,
+        "non_response_percentage": non_response_pct,
+        "counts": counts,
+        "percentages": percentages,
+    }
+
+
+@router.delete("/{question_id}/stats", status_code=204)
+async def reset_question_stats(question_id: int, db: AsyncSession = Depends(get_db)):
+    """Clear the cumulative tally for a single question."""
+    q = await db.get(Question, question_id)
+    if not q:
+        raise HTTPException(404, "Question not found")
+    rows = (await db.execute(
+        select(QuestionAnswerStat).where(QuestionAnswerStat.question_id == question_id)
+    )).scalars().all()
+    for r in rows:
+        await db.delete(r)
+    await db.commit()
 
 
 @router.post("", response_model=QuestionRead, status_code=201)
