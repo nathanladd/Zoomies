@@ -439,7 +439,17 @@ async def _reveal_and_broadcast(game_id: int, engine: GameEngine) -> None:
     if engine.status != "active":
         return
     timer_task = getattr(engine, "timer_task", None)
-    if timer_task is not None and not timer_task.done():
+    # If we're being called from inside the timer task itself (the natural
+    # expiry path), do NOT cancel it — that schedules a CancelledError which
+    # fires at the next await (inside on_reveal or broadcast_to_all) and
+    # the question_end message never reaches the clients, leaving the timer
+    # visibly frozen at the last tick. The loop is already exiting anyway.
+    current = asyncio.current_task()
+    if (
+        timer_task is not None
+        and not timer_task.done()
+        and timer_task is not current
+    ):
         timer_task.cancel()
     engine.timer_task = None
 
