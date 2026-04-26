@@ -82,6 +82,11 @@ class ApiClient:
         _raise_for_status(resp)
         return resp.json()
 
+    def list_question_stats_summary(self) -> list[dict[str, Any]]:
+        resp = self.client.get("/api/questions/stats/summary")
+        _raise_for_status(resp)
+        return resp.json()
+
     def reset_question_stats(self, question_id: int) -> None:
         resp = self.client.delete(f"/api/questions/{question_id}/stats")
         _raise_for_status(resp)

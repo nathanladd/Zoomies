@@ -668,6 +668,25 @@ class QuestionPool(QWidget):
         self.btn_refresh = QPushButton("Refresh")
         self.btn_refresh.clicked.connect(self.refresh)
 
+        # Sort selector — applied client-side after fetching the question list.
+        # "Most missed" pulls aggregate miss-rate stats and orders questions
+        # with the highest miss rate first; ties / zero-data fall back to
+        # newest-first so the list stays stable for fresh installs.
+        self.sort_combo = QComboBox()
+        self.sort_combo.addItem("Newest", "newest")
+        self.sort_combo.addItem("Oldest", "oldest")
+        self.sort_combo.addItem("Most missed", "most_missed")
+        self.sort_combo.currentIndexChanged.connect(self.refresh)
+
+        # Filter by question type — kept separate from the topic filter so the
+        # two can be combined (e.g. only multiple-choice within a given topic).
+        self.type_filter = QComboBox()
+        self.type_filter.addItem("All Types", None)
+        self.type_filter.addItem("Multiple choice", "multiple_choice")
+        self.type_filter.addItem("True/False", "true_false")
+        self.type_filter.addItem("Tech A/B", "technician_ab")
+        self.type_filter.currentIndexChanged.connect(self.refresh)
+
         # Filter by topic
         self.topic_filter = QComboBox()
         self.topic_filter.addItem("All Topics", None)
@@ -677,7 +696,10 @@ class QuestionPool(QWidget):
         toolbar.addWidget(self.btn_edit)
         toolbar.addWidget(self.btn_delete)
         toolbar.addStretch()
+        toolbar.addWidget(QLabel("Sort:"))
+        toolbar.addWidget(self.sort_combo)
         toolbar.addWidget(QLabel("Filter:"))
+        toolbar.addWidget(self.type_filter)
         toolbar.addWidget(self.topic_filter)
         toolbar.addWidget(self.btn_refresh)
         layout.addLayout(toolbar)
@@ -718,6 +740,35 @@ class QuestionPool(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to load questions: {e}")
             return
+
+        type_filter = self.type_filter.currentData() if hasattr(self, "type_filter") else None
+        if type_filter:
+            questions = [q for q in questions if q.get("question_type") == type_filter]
+
+        sort_mode = self.sort_combo.currentData() if hasattr(self, "sort_combo") else "newest"
+        if sort_mode == "oldest":
+            questions.sort(key=lambda q: int(q["id"]))
+        elif sort_mode == "most_missed":
+            try:
+                summary = self.api.list_question_stats_summary()
+                miss_by_id = {
+                    int(s["question_id"]): (
+                        float(s.get("miss_rate", 0.0) or 0.0),
+                        int(s.get("miss_count", 0) or 0),
+                    )
+                    for s in summary
+                }
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Failed to load stats: {e}")
+                miss_by_id = {}
+            # Highest miss-rate first, then highest miss-count, then newest id.
+            questions.sort(
+                key=lambda q: (
+                    -miss_by_id.get(int(q["id"]), (0.0, 0))[0],
+                    -miss_by_id.get(int(q["id"]), (0.0, 0))[1],
+                    -int(q["id"]),
+                )
+            )
 
         self.table.setRowCount(len(questions))
         for row, q in enumerate(questions):

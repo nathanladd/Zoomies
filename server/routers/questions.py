@@ -38,15 +38,50 @@ async def list_questions(
     return [_question_to_read(q) for q in result.scalars().all()]
 
 
+NO_RESPONSE_KEY = "__no_response__"
+
+
+@router.get("/stats/summary")
+async def list_question_stats_summary(db: AsyncSession = Depends(get_db)):
+    """Aggregate miss-rate summary for every question.
+
+    For each question returns total responses (including non-responses) and
+    the number of "misses" — players who picked any non-correct answer or
+    failed to pick at all. Used by the instructor's question pool to sort
+    questions by how often they trip students up.
+    """
+    rows = (await db.execute(select(QuestionAnswerStat))).scalars().all()
+    by_qid: dict[int, dict[str, int]] = {}
+    for r in rows:
+        bucket = by_qid.setdefault(r.question_id, {})
+        bucket[r.answer_text] = bucket.get(r.answer_text, 0) + int(r.times_chosen or 0)
+
+    questions = (await db.execute(select(Question.id, Question.correct_answer))).all()
+    summary = []
+    for qid, correct in questions:
+        bucket = by_qid.get(qid, {})
+        non_responses = int(bucket.get(NO_RESPONSE_KEY, 0) or 0)
+        responses = sum(v for k, v in bucket.items() if k != NO_RESPONSE_KEY)
+        total = responses + non_responses
+        correct_count = int(bucket.get(correct or "", 0) or 0)
+        miss_count = total - correct_count
+        miss_rate = (miss_count * 100.0 / total) if total else 0.0
+        summary.append({
+            "question_id": qid,
+            "total": total,
+            "correct_count": correct_count,
+            "miss_count": miss_count,
+            "miss_rate": miss_rate,
+        })
+    return summary
+
+
 @router.get("/{question_id}", response_model=QuestionRead)
 async def get_question(question_id: int, db: AsyncSession = Depends(get_db)):
     q = await db.get(Question, question_id)
     if not q:
         raise HTTPException(404, "Question not found")
     return _question_to_read(q)
-
-
-NO_RESPONSE_KEY = "__no_response__"
 
 
 @router.get("/{question_id}/stats")
