@@ -574,6 +574,22 @@ class QuestionDialog(QDialog):
     def _format_pct(self, pct: float, count: int) -> str:
         return f"{pct:.0f}% ({count})"
 
+    # Base font size kept in sync with the widget styling in __init__.
+    _STAT_BASE_STYLE = "font-size: 11px;"
+    _STAT_STYLE_NEUTRAL = f"color: #555; {_STAT_BASE_STYLE}"
+    _STAT_STYLE_CORRECT = f"color: #15803d; font-weight: bold; {_STAT_BASE_STYLE}"
+    _STAT_STYLE_WRONG = f"color: #b91c1c; font-weight: bold; {_STAT_BASE_STYLE}"
+
+    def _style_stat_label(self, label: QLabel, is_correct: bool, has_text: bool) -> None:
+        """Color the stat green if it belongs to the correct answer, red if
+        it belongs to a wrong answer. Empty slots stay neutral gray."""
+        if not has_text:
+            label.setStyleSheet(self._STAT_STYLE_NEUTRAL)
+        elif is_correct:
+            label.setStyleSheet(self._STAT_STYLE_CORRECT)
+        else:
+            label.setStyleSheet(self._STAT_STYLE_WRONG)
+
     def _apply_stats(self, stats: dict):
         counts = stats.get("counts", {}) or {}
         percentages = stats.get("percentages", {}) or {}
@@ -587,16 +603,28 @@ class QuestionDialog(QDialog):
             return self._format_pct(pct, count)
 
         # Multiple-choice: each slot has free-form text we can match directly.
+        # The radio that's currently checked marks the correct answer.
         for letter, le in self.mc_inputs.items():
-            self.mc_stats[letter].setText(lookup(le.text()))
+            txt = lookup(le.text())
+            lbl = self.mc_stats[letter]
+            lbl.setText(txt)
+            is_correct = self.mc_radios[letter].isChecked() and bool(le.text().strip())
+            self._style_stat_label(lbl, is_correct, bool(txt))
 
         # True/False: stored under literal strings "True" / "False".
-        self.tf_stat_true.setText(lookup("True"))
-        self.tf_stat_false.setText(lookup("False"))
+        tf_true_txt = lookup("True")
+        tf_false_txt = lookup("False")
+        self.tf_stat_true.setText(tf_true_txt)
+        self.tf_stat_false.setText(tf_false_txt)
+        self._style_stat_label(self.tf_stat_true, self.tf_true.isChecked(), bool(tf_true_txt))
+        self._style_stat_label(self.tf_stat_false, self.tf_false.isChecked(), bool(tf_false_txt))
 
         # Technician A/B: stored under the full phrase (label prefix stripped).
         for letter, phrase in self.ab_choices:
-            self.ab_stats[letter].setText(lookup(phrase))
+            txt = lookup(phrase)
+            lbl = self.ab_stats[letter]
+            lbl.setText(txt)
+            self._style_stat_label(lbl, self.ab_radios[letter].isChecked(), bool(txt))
 
     def _reset_stats(self):
         if not self.question:
