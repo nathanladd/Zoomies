@@ -478,10 +478,11 @@ class GameControlPanel(QWidget):
             self.btn_next.setEnabled(False)
             self.btn_next.setText("Next Question")
             self.btn_reveal.setEnabled(True)
-            # Reset per-question answer markers and refresh leaderboard so the
-            # ✓/✗ column clears between questions.
+            # Reset per-question answer markers but keep existing scores so
+            # the leaderboard persists across questions. Only the ✓/✗ column
+            # clears between questions.
             self._answer_status.clear()
-            self._update_leaderboard_from_players()
+            self._refresh_answer_column()
             self._show_question(msg)
             if self.projection_window:
                 self.projection_window.on_question_start(msg)
@@ -527,9 +528,11 @@ class GameControlPanel(QWidget):
             self.btn_next.setEnabled(False)
             self.btn_reveal.setEnabled(False)
             self.btn_end.setEnabled(False)
-            self._players.clear()
+            # Keep the leaderboard and player list visible after the game
+            # ends so the instructor can review results. Everything is
+            # cleared by _reset_ui_for_new_game() when the next game starts.
             self._answer_status.clear()
-            self.lb_table.setRowCount(0)
+            self._refresh_answer_column()
             self._clear_question()
             if self.projection_window:
                 self.projection_window.on_game_end(msg)
