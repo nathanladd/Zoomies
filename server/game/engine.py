@@ -322,6 +322,21 @@ class GameEngine(BaseGame):
         raw = self._get_raw_choices(qdata)
         if randomize:
             random.shuffle(raw)
+        else:
+            # Honor the instructor's A/B/C/D slot assignment. The stored order
+            # is [correct, wrong1, wrong2, wrong3]; reinsert the correct text
+            # at `correct_index` so the instructor-chosen letter stays fixed.
+            correct_idx = qdata.get("correct_index") or 0
+            try:
+                correct_idx = int(correct_idx)
+            except (TypeError, ValueError):
+                correct_idx = 0
+            correct_idx = max(0, min(correct_idx, len(raw) - 1))
+            correct_text = raw[0]
+            wrongs = raw[1:]
+            ordered = list(wrongs)
+            ordered.insert(correct_idx, correct_text)
+            raw = ordered[:len(raw)]
         choices = [f"{labels[i]}) {raw[i]}" for i in range(len(raw))]
         correct = next(c for c in choices if c.endswith(f") {qdata['correct_answer']}"))
         return choices, correct

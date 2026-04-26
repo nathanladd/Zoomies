@@ -191,24 +191,42 @@ class QuestionDialog(QDialog):
         self.image_zone.cleared.connect(self._on_image_cleared)
         layout.addRow("Image:", self.image_zone)
 
-        # Answers
-        self.correct_input = QLineEdit()
-        self.correct_input.setPlaceholderText("Correct answer")
-        self.wrong1_input = QLineEdit()
-        self.wrong1_input.setPlaceholderText("Wrong answer 1")
-        self.wrong2_input = QLineEdit()
-        self.wrong2_input.setPlaceholderText("Wrong answer 2")
-        self.wrong3_input = QLineEdit()
-        self.wrong3_input.setPlaceholderText("Wrong answer 3")
-
-        layout.addRow("Correct:", self.correct_input)
-        self._row_correct = layout.rowCount() - 1
-        layout.addRow("Wrong 1:", self.wrong1_input)
-        self._row_wrong1 = layout.rowCount() - 1
-        layout.addRow("Wrong 2:", self.wrong2_input)
-        self._row_wrong2 = layout.rowCount() - 1
-        layout.addRow("Wrong 3:", self.wrong3_input)
-        self._row_wrong3 = layout.rowCount() - 1
+        # Multiple-choice answers — four fixed A/B/C/D slots. Each row has a
+        # radio button that marks which slot is the correct answer, plus a
+        # free-text field for the answer text. Slots C and D are optional.
+        # When the question's `randomize_answers` is disabled, the server shows
+        # answers to students in this exact A/B/C/D order, which lets the
+        # instructor write choices like "Both A and B" that reference the
+        # letter labels directly.
+        self.mc_letters = ["A", "B", "C", "D"]
+        self.mc_group = QButtonGroup(self)
+        self.mc_radios: dict[str, QRadioButton] = {}
+        self.mc_inputs: dict[str, QLineEdit] = {}
+        mc_container = QWidget()
+        mc_layout = QVBoxLayout(mc_container)
+        mc_layout.setContentsMargins(0, 0, 0, 0)
+        mc_layout.setSpacing(4)
+        for letter in self.mc_letters:
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            rb = QRadioButton(f"{letter}.")
+            rb.setToolTip(f"Mark answer {letter} as the correct answer")
+            le = QLineEdit()
+            if letter in ("A", "B"):
+                le.setPlaceholderText(f"Answer {letter}")
+            else:
+                le.setPlaceholderText(f"Answer {letter} (optional)")
+            self.mc_group.addButton(rb)
+            self.mc_radios[letter] = rb
+            self.mc_inputs[letter] = le
+            row.addWidget(rb)
+            row.addWidget(le, 1)
+            row_widget = QWidget()
+            row_widget.setLayout(row)
+            mc_layout.addWidget(row_widget)
+        self.mc_radios["A"].setChecked(True)
+        layout.addRow("Answers:", mc_container)
+        self._row_mc = layout.rowCount() - 1
 
         # True/False radio row — only shown when question_type == "true_false"
         tf_row = QHBoxLayout()
@@ -225,6 +243,30 @@ class QuestionDialog(QDialog):
         tf_widget.setLayout(tf_row)
         layout.addRow("Answer:", tf_widget)
         self._row_tf = layout.rowCount() - 1
+
+        # Technician A/B radio rows — only shown when question_type == "technician_ab".
+        # All four ASE choices are listed in fixed order; user picks the correct one.
+        self.ab_choices = [
+            ("A", "Technician A only"),
+            ("B", "Technician B only"),
+            ("C", "Both Technician A and Technician B"),
+            ("D", "Neither Technician A nor Technician B"),
+        ]
+        self.ab_group = QButtonGroup(self)
+        self.ab_radios: dict[str, QRadioButton] = {}
+        ab_container = QWidget()
+        ab_layout = QVBoxLayout(ab_container)
+        ab_layout.setContentsMargins(0, 0, 0, 0)
+        ab_layout.setSpacing(2)
+        for letter, text in self.ab_choices:
+            rb = QRadioButton(f"{letter}. {text}")
+            self.ab_group.addButton(rb)
+            self.ab_radios[letter] = rb
+            ab_layout.addWidget(rb)
+        self.ab_radios["A"].setChecked(True)
+        layout.addRow("Answers:", ab_container)
+        self._row_ab = layout.rowCount() - 1
+
         self._form_layout = layout
 
         # Time slider
@@ -256,15 +298,38 @@ class QuestionDialog(QDialog):
                     self.topic_combo.setCurrentIndex(idx)
             self.text_input.setText(question.get("text", "") or "")
             ca = question.get("correct_answer", "") or ""
-            self.correct_input.setText(ca)
-            if (question.get("question_type") == "true_false"):
+            qtype = question.get("question_type", "multiple_choice")
+            if qtype == "true_false":
                 if ca.lower() == "false":
                     self.tf_false.setChecked(True)
                 else:
                     self.tf_true.setChecked(True)
-            self.wrong1_input.setText(question.get("wrong_answer_1", ""))
-            self.wrong2_input.setText(question.get("wrong_answer_2", "") or "")
-            self.wrong3_input.setText(question.get("wrong_answer_3", "") or "")
+            if qtype == "multiple_choice":
+                # Reconstruct the instructor's A/B/C/D layout. The server stores
+                # [correct, wrong1, wrong2, wrong3] plus `correct_index` (0-3)
+                # telling which slot the correct answer was in. Wrongs fill the
+                # remaining slots in A/B/C/D order.
+                wrongs = [
+                    question.get("wrong_answer_1", "") or "",
+                    question.get("wrong_answer_2", "") or "",
+                    question.get("wrong_answer_3", "") or "",
+                ]
+                try:
+                    correct_idx = int(question.get("correct_index") or 0)
+                except (TypeError, ValueError):
+                    correct_idx = 0
+                correct_idx = max(0, min(correct_idx, 3))
+                slots = [""] * 4
+                slots[correct_idx] = ca
+                wi = 0
+                for i in range(4):
+                    if i == correct_idx:
+                        continue
+                    slots[i] = wrongs[wi] if wi < len(wrongs) else ""
+                    wi += 1
+                for letter, value in zip(self.mc_letters, slots):
+                    self.mc_inputs[letter].setText(value)
+                self.mc_radios[self.mc_letters[correct_idx]].setChecked(True)
             self.time_slider.setValue(question.get("time_seconds", 10))
             self._existing_image = question.get("image_filename")
             self.image_zone.set_existing(self._existing_image)
@@ -275,6 +340,11 @@ class QuestionDialog(QDialog):
                 self.randomize_check.setChecked(bool(ra))
                 self.randomize_check.blockSignals(False)
                 self._randomize_user_set = True
+            if question.get("question_type") == "technician_ab":
+                letter = (ca or "A").strip().upper()
+                if letter not in self.ab_radios:
+                    letter = "A"
+                self.ab_radios[letter].setChecked(True)
 
         self._on_type_changed(self.type_combo.currentText())
 
@@ -289,7 +359,19 @@ class QuestionDialog(QDialog):
         self._randomize_user_set = True
 
     def _apply_randomize_default(self, qtype: str):
-        """If the user hasn't explicitly set the checkbox, apply the per-type default."""
+        """Apply the per-type default for the randomize checkbox.
+
+        technician_ab questions never randomize — the checkbox is forced off and
+        disabled regardless of any prior user/saved value. For other types, the
+        default is only applied when the user hasn't explicitly toggled it.
+        """
+        if qtype == "technician_ab":
+            self.randomize_check.blockSignals(True)
+            self.randomize_check.setChecked(False)
+            self.randomize_check.blockSignals(False)
+            self.randomize_check.setEnabled(False)
+            return
+        self.randomize_check.setEnabled(True)
         if self._randomize_user_set:
             return
         default = qtype == "multiple_choice"
@@ -316,28 +398,13 @@ class QuestionDialog(QDialog):
     def _on_type_changed(self, qtype: str):
         self._apply_randomize_default(qtype)
         is_tf = qtype == "true_false"
+        is_ab = qtype == "technician_ab"
+        is_mc = qtype == "multiple_choice"
 
-        # True/False row only shows for true_false; all text answer rows hide.
+        # Each answer-entry row only shows for its own type.
         self._set_row_visible(self._row_tf, is_tf)
-        for row in (self._row_correct, self._row_wrong1,
-                    self._row_wrong2, self._row_wrong3):
-            self._set_row_visible(row, not is_tf)
-
-        if qtype == "technician_ab":
-            self.correct_input.setEnabled(True)
-            self.correct_input.setPlaceholderText("A, B, C, or D")
-            self.wrong1_input.setText("(auto)")
-            self.wrong1_input.setEnabled(False)
-            self.wrong2_input.clear()
-            self.wrong2_input.setEnabled(False)
-            self.wrong3_input.clear()
-            self.wrong3_input.setEnabled(False)
-        elif not is_tf:
-            self.correct_input.setEnabled(True)
-            self.wrong1_input.setEnabled(True)
-            self.wrong2_input.setEnabled(True)
-            self.wrong3_input.setEnabled(True)
-            self.correct_input.setPlaceholderText("Correct answer")
+        self._set_row_visible(self._row_ab, is_ab)
+        self._set_row_visible(self._row_mc, is_mc)
 
     def get_data(self) -> dict:
         qtype = self.type_combo.currentText()
@@ -347,8 +414,10 @@ class QuestionDialog(QDialog):
             "question_type": qtype,
             "topic_id": topic_id,
             "text": self.text_input.toPlainText().strip() or None,
-            "correct_answer": self.correct_input.text().strip(),
-            "wrong_answer_1": self.wrong1_input.text().strip(),
+            "correct_answer": "",
+            "wrong_answer_1": "",
+            "wrong_answer_2": None,
+            "wrong_answer_3": None,
             "time_seconds": self.time_slider.value(),
             "randomize_answers": self.randomize_check.isChecked(),
         }
@@ -359,23 +428,48 @@ class QuestionDialog(QDialog):
             data["wrong_answer_1"] = "False" if chosen == "True" else "True"
             data["wrong_answer_2"] = None
             data["wrong_answer_3"] = None
-        elif qtype == "technician_ab":
-            choices = [
-                "Technician A only", "Technician B only",
-                "Both Technician A and Technician B",
-                "Neither Technician A nor Technician B",
+        elif qtype == "multiple_choice":
+            # Collect A/B/C/D answer texts, determine which slot is correct,
+            # and send correct_answer + wrong_answer_1..3 in A/B/C/D order
+            # (skipping the correct slot). When randomize_answers is False,
+            # the server displays them in the exact order we send the wrongs,
+            # so letter-referencing choices like "Both A and B" stay stable.
+            correct_letter = "A"
+            for letter in self.mc_letters:
+                if self.mc_radios[letter].isChecked():
+                    correct_letter = letter
+                    break
+            values = {
+                letter: self.mc_inputs[letter].text().strip()
+                for letter in self.mc_letters
+            }
+            data["correct_answer"] = values[correct_letter]
+            data["correct_index"] = self.mc_letters.index(correct_letter)
+            wrongs = [
+                values[letter]
+                for letter in self.mc_letters
+                if letter != correct_letter
             ]
-            correct_letter = data["correct_answer"].upper()
-            letter_map = {"A": 0, "B": 1, "C": 2, "D": 3}
-            idx = letter_map.get(correct_letter, 0)
+            data["wrong_answer_1"] = wrongs[0] if len(wrongs) > 0 else ""
+            data["wrong_answer_2"] = wrongs[1] if len(wrongs) > 1 and wrongs[1] else None
+            data["wrong_answer_3"] = wrongs[2] if len(wrongs) > 2 and wrongs[2] else None
+        elif qtype == "technician_ab":
+            # Technician A/B answers are fixed and never randomized; the user
+            # picked the correct letter via the radio group.
+            letters = [letter for letter, _ in self.ab_choices]
+            correct_letter = "A"
+            for letter in letters:
+                if self.ab_radios[letter].isChecked():
+                    correct_letter = letter
+                    break
+            choices = [text for _, text in self.ab_choices]
+            idx = letters.index(correct_letter)
             data["correct_answer"] = correct_letter
+            data["randomize_answers"] = False
             wrong = [c for i, c in enumerate(choices) if i != idx]
             data["wrong_answer_1"] = wrong[0] if len(wrong) > 0 else ""
             data["wrong_answer_2"] = wrong[1] if len(wrong) > 1 else None
             data["wrong_answer_3"] = wrong[2] if len(wrong) > 2 else None
-        else:
-            data["wrong_answer_2"] = self.wrong2_input.text().strip() or None
-            data["wrong_answer_3"] = self.wrong3_input.text().strip() or None
 
         return data
 

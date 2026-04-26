@@ -35,6 +35,7 @@ class QuestionCreate(BaseModel):
     wrong_answer_3: str | None = None
     time_seconds: int = Field(default=20, ge=5, le=30)
     randomize_answers: bool | None = None
+    correct_index: int = Field(default=0, ge=0, le=3)
 
 class QuestionUpdate(BaseModel):
     topic_id: int | None = None
@@ -46,6 +47,7 @@ class QuestionUpdate(BaseModel):
     wrong_answer_3: str | None = None
     time_seconds: int | None = Field(default=None, ge=5, le=30)
     randomize_answers: bool | None = None
+    correct_index: int | None = Field(default=None, ge=0, le=3)
 
 class QuestionRead(BaseModel):
     id: int
@@ -59,6 +61,7 @@ class QuestionRead(BaseModel):
     wrong_answer_3: str | None
     time_seconds: int
     randomize_answers: bool = True
+    correct_index: int = 0
     created_at: datetime
     topic_name: str | None = None
 

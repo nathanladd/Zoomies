@@ -37,6 +37,9 @@ class Question(Base):
     wrong_answer_3: Mapped[str | None] = mapped_column(String, nullable=True)
     time_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
     randomize_answers: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Position (0-3 → A/B/C/D) of the correct answer when randomize_answers is False.
+    # Only meaningful for multiple_choice. Ignored when randomize_answers is True.
+    correct_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     topic: Mapped[Topic | None] = relationship(back_populates="questions", lazy="selectin")

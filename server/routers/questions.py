@@ -20,6 +20,7 @@ def _question_to_read(q: Question) -> QuestionRead:
         correct_answer=q.correct_answer, wrong_answer_1=q.wrong_answer_1,
         wrong_answer_2=q.wrong_answer_2, wrong_answer_3=q.wrong_answer_3,
         time_seconds=q.time_seconds, randomize_answers=q.randomize_answers,
+        correct_index=q.correct_index,
         created_at=q.created_at,
         topic_name=q.topic.name if q.topic else None,
     )
@@ -61,6 +62,7 @@ async def create_question(body: QuestionCreate, db: AsyncSession = Depends(get_d
         wrong_answer_3=body.wrong_answer_3,
         time_seconds=body.time_seconds,
         randomize_answers=randomize,
+        correct_index=body.correct_index,
     )
     db.add(q)
     await db.commit()

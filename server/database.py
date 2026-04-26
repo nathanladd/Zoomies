@@ -51,6 +51,11 @@ def _run_lightweight_migrations(sync_conn) -> None:
             "ALTER TABLE questions ADD COLUMN randomize_answers BOOLEAN NOT NULL DEFAULT 1"
         ))
 
+    if not _column_exists("questions", "correct_index"):
+        sync_conn.execute(text(
+            "ALTER TABLE questions ADD COLUMN correct_index INTEGER NOT NULL DEFAULT 0"
+        ))
+
 
 async def get_db() -> AsyncSession:  # type: ignore[misc]
     async with async_session() as session:
