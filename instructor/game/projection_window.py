@@ -278,7 +278,14 @@ class ProjectionWindow(QWidget):
             )
         self.question_label.setText(
             f'<div style="text-align:center;">'
-            f'<div style="font-size:58px; font-weight:bold; color:#818cf8; margin-bottom:28px;">Project Needs a Name</div>'
+            f'<div style="font-size:64px; font-weight:bold; color:#818cf8; margin-bottom:12px; letter-spacing:2px;">ZÜNDPUNKT</div>'
+            f'<div style="font-size:18px; font-style:italic; color:#cbd5e1; margin-bottom:6px; line-height:1.4;">'
+            f'Zündpunkt &mdash; the ignition point &mdash; the moment pressure and fuel combine and something useful happens.'
+            f'</div>'
+            f'<div style="font-size:15px; color:#94a3b8; margin-bottom:14px;">(What I think Rudolf Diesel would call this game.)</div>'
+            f'<div style="font-size:17px; font-style:italic; color:#fbbf24; margin-bottom:24px;">'
+            f'&ldquo;Do not fear failure, but rather fear not trying at all.&rdquo; &mdash; Rudolf Diesel'
+            f'</div>'
             f'<div style="font-size:20px; color:#94a3b8; margin-bottom:4px;">Join at</div>'
             f'<div style="font-size:40px; font-weight:bold; color:#818cf8; margin-bottom:16px;">{self._join_url}</div>'
             f'<div style="font-size:32px; font-weight:bold; color:#34d399; margin-bottom:16px;">{game_text}</div>'
