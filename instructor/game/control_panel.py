@@ -150,6 +150,10 @@ class GameControlPanel(QWidget):
     # Emitted when the user clicks "Restart Server" — MainWindow handles the
     # actual stop/start since it owns the QProcess.
     restart_server_requested = pyqtSignal()
+    # Emitted from the background stats-fetch thread once the HTTP roundtrip
+    # to /api/questions/{id}/stats finishes. Carries (question_id, stats_dict)
+    # so the GUI slot can verify the result still matches the active question.
+    _stats_loaded = pyqtSignal(int, dict)
 
     def __init__(self, api: ApiClient, server_process: QProcess | None = None):
         super().__init__()
@@ -166,6 +170,8 @@ class GameControlPanel(QWidget):
         self._points_spinner_idx = 0
         self._points_line_active = False
         self._build_ui()
+        # Marshal background-thread stat results back onto the GUI thread.
+        self._stats_loaded.connect(self._on_stats_loaded)
         self._setup_log_redirect()
         if self._server_process is not None:
             self._server_process.readyReadStandardOutput.connect(self._read_server_output)
@@ -453,6 +459,30 @@ class GameControlPanel(QWidget):
     def _on_ws_message(self, msg: dict):
         msg_type = msg.get("type")
 
+        # Update the projection window FIRST for every visible-state message
+        # so the projector never has to wait for slower control-panel work
+        # (table rebuilds, HTTP stat fetches, log appends) running on the
+        # same GUI thread. The control panel's own widgets repaint on the
+        # next event-loop iteration regardless of order.
+        proj = self.projection_window
+        if proj is not None:
+            if msg_type == "player_joined":
+                proj.on_player_joined(msg)
+            elif msg_type == "game_start":
+                proj.on_game_start(msg)
+            elif msg_type == "question_start":
+                proj.on_question_start(msg)
+            elif msg_type == "points_update":
+                proj.on_points_update(msg)
+            elif msg_type == "choice_eliminated":
+                proj.on_choice_eliminated(msg)
+            elif msg_type == "answer_count":
+                proj.on_answer_count(msg)
+            elif msg_type == "question_end":
+                proj.on_question_end(msg)
+            elif msg_type == "game_end":
+                proj.on_game_end(msg)
+
         if msg_type == "player_joined":
             self.players_label.setText(f"Players: {msg.get('player_count', 0)}")
             pid = msg.get("player_id")
@@ -460,8 +490,6 @@ class GameControlPanel(QWidget):
             if pid is not None:
                 self._players[pid] = name
             self._update_leaderboard_from_players()
-            if self.projection_window:
-                self.projection_window.on_player_joined(msg)
 
         elif msg_type == "player_left":
             self.players_label.setText(f"Players: {msg.get('player_count', 0)}")
@@ -475,8 +503,6 @@ class GameControlPanel(QWidget):
                 self.game_label.setText(f"Game #{self.current_game_id} (running)")
             self.btn_start.setEnabled(False)
             self.btn_next.setEnabled(True)
-            if self.projection_window:
-                self.projection_window.on_game_start(msg)
 
         elif msg_type == "question_start":
             idx = msg.get("index", 0)
@@ -494,10 +520,9 @@ class GameControlPanel(QWidget):
             self._show_question(msg)
             qid = msg.get("question_id")
             self._current_question_id = int(qid) if qid is not None else None
-            # Defer the HTTP fetch so the UI repaints first.
-            QTimer.singleShot(0, lambda q=self._current_question_id: self._load_question_stats(q))
-            if self.projection_window:
-                self.projection_window.on_question_start(msg)
+            # Stats fetch hits the HTTP API synchronously; run it on a
+            # worker thread so a slow response can't freeze the projector.
+            self._fetch_question_stats_async(self._current_question_id)
 
         elif msg_type == "question_answer":
             self._highlight_correct(msg.get("correct_answer", ""))
@@ -507,12 +532,6 @@ class GameControlPanel(QWidget):
             secs = remaining / 1000
             self.time_label.setText(f"Time: {secs:.1f}s | Pts: {msg.get('current_points', 0)}")
             self._log_points_tick()
-            if self.projection_window:
-                self.projection_window.on_points_update(msg)
-
-        elif msg_type == "choice_eliminated":
-            if self.projection_window:
-                self.projection_window.on_choice_eliminated(msg)
 
         elif msg_type == "player_answered":
             pid = msg.get("player_id")
@@ -522,8 +541,6 @@ class GameControlPanel(QWidget):
 
         elif msg_type == "answer_count":
             self.answers_label.setText(f"Answers: {msg.get('answered', 0)}/{msg.get('total', 0)}")
-            if self.projection_window:
-                self.projection_window.on_answer_count(msg)
 
         elif msg_type == "question_end":
             self.btn_reveal.setEnabled(False)
@@ -531,9 +548,7 @@ class GameControlPanel(QWidget):
             self.time_label.setText("Time: -")
             self._update_leaderboard(msg.get("player_scores", []))
             # Refresh the cumulative pick rates so this round's answers show.
-            QTimer.singleShot(0, lambda q=self._current_question_id: self._load_question_stats(q))
-            if self.projection_window:
-                self.projection_window.on_question_end(msg)
+            self._fetch_question_stats_async(self._current_question_id)
 
         elif msg_type == "game_end":
             self.status_label.setText("Status: Game finished!")
@@ -548,8 +563,6 @@ class GameControlPanel(QWidget):
             self._answer_status.clear()
             self._refresh_answer_column()
             self._clear_question()
-            if self.projection_window:
-                self.projection_window.on_game_end(msg)
 
     def _start_game(self):
         if self.ws_thread:
@@ -655,20 +668,41 @@ class GameControlPanel(QWidget):
             return text[3:]
         return text
 
-    def _load_question_stats(self, question_id: int | None):
-        """Fetch cumulative pick rates for the active question and refresh the
-        per-choice stat labels. Best-effort — logs and bails on any error."""
+    def _fetch_question_stats_async(self, question_id: int | None) -> None:
+        """Fetch cumulative pick rates on a worker thread and emit the result
+        back to the GUI thread via ``_stats_loaded``.
+
+        Doing the HTTP roundtrip on the GUI thread (as the previous
+        ``_load_question_stats`` did) blocked rendering for the duration of
+        the request, which made the projection window visibly stutter on
+        every question_start / question_end. ``threading.Thread`` is enough
+        here — pyqtSignal.emit() is thread-safe and the connection is queued
+        across threads, so the slot runs on the GUI thread.
+        """
         if question_id is None:
             return
-        # Snapshot of which question we're populating so a slow response
-        # for an old question doesn't overwrite a newly-shown one.
-        target = question_id
-        try:
-            stats = self.api.get_question_stats(question_id)
-        except Exception as e:
-            print(f"[INSTR] question stats unavailable: {e}")
-            return
-        if self._current_question_id != target:
+        target = int(question_id)
+
+        def _worker() -> None:
+            try:
+                stats = self.api.get_question_stats(target)
+            except Exception as e:
+                print(f"[INSTR] question stats unavailable: {e}")
+                return
+            if not isinstance(stats, dict):
+                return
+            self._stats_loaded.emit(target, stats)
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_stats_loaded(self, question_id: int, stats: dict) -> None:
+        """GUI-thread slot: render stats fetched by the worker thread.
+
+        Discards results that arrive after the user has moved on to a
+        different question so a slow response can't overwrite a freshly-
+        shown one.
+        """
+        if self._current_question_id != question_id:
             return
         counts = stats.get("counts", {}) or {}
         percentages = stats.get("percentages", {}) or {}

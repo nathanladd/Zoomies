@@ -134,20 +134,52 @@ async def handle_student_ws(ws: WebSocket, game_id: int) -> None:
             await ws.close(code=4002, reason="Name is required")
             return
 
-        # Create player in DB (short-lived DB session via async_session factory).
+        # Reuse an existing Player row for this (game_id, name) if one exists —
+        # this is what a mid-game WS reconnect looks like. A fresh join gets a
+        # fresh row. We match case-insensitively on name so a flaky reconnect
+        # with slightly different casing still rejoins the same player.
+        is_reconnect = False
         async with async_session() as db:
-            player = Player(game_id=game_id, name=name)
-            db.add(player)
-            await db.commit()
-            await db.refresh(player)
-            player_id = player.id
+            existing = (await db.execute(
+                select(Player).where(
+                    Player.game_id == game_id,
+                    Player.name == name,
+                )
+            )).scalar_one_or_none()
+            if existing is not None:
+                player_id = existing.id
+                is_reconnect = True
+            else:
+                player = Player(game_id=game_id, name=name)
+                db.add(player)
+                await db.commit()
+                await db.refresh(player)
+                player_id = player.id
+
+        # If this player already has a live WS in the manager, drop the old
+        # socket so the manager only ever holds one connection per player_id.
+        old_ws = manager.student_connections.get(game_id, {}).get(player_id)
+        if old_ws is not None and old_ws is not ws:
+            try:
+                await old_ws.close(code=4003, reason="Replaced by reconnect")
+            except Exception:
+                pass
 
         # Register with connection manager (skip accept — already accepted above)
         if game_id not in manager.student_connections:
             manager.student_connections[game_id] = {}
         manager.student_connections[game_id][player_id] = ws
-        join_info = await engine.on_player_join(player_id, name)
-        print(f"[WS-STUDENT] Player {player_id} ({name}) joined game {game_id}")
+        if is_reconnect and player_id in engine.players:
+            # Preserve the in-memory score on reconnect; no need to re-announce.
+            join_info = {
+                "player_id": player_id,
+                "name": name,
+                "player_count": len(engine.players),
+            }
+            print(f"[WS-STUDENT] Player {player_id} ({name}) reconnected to game {game_id}")
+        else:
+            join_info = await engine.on_player_join(player_id, name)
+            print(f"[WS-STUDENT] Player {player_id} ({name}) joined game {game_id}")
 
         # Confirm join to this student
         await manager.send_to_student(game_id, player_id, {
@@ -206,12 +238,14 @@ async def handle_student_ws(ws: WebSocket, game_id: int) -> None:
 
                     # Persist a cumulative tally of how often this answer
                     # text has been chosen for this question across all games.
+                    # Fire-and-forget so simultaneous submissions don't
+                    # serialize on this write.
                     q_state = engine.current_question
                     if q_state is not None:
-                        await _record_answer_stat(
+                        asyncio.create_task(_record_answer_stat(
                             q_state.question_id,
                             _stat_key(result.get("choice", "")),
-                        )
+                        ))
 
                     # If every player has answered, reveal early instead of
                     # waiting for the timer to expire.
@@ -384,7 +418,8 @@ async def _question_timer_loop(game_id: int, engine: GameEngine) -> None:
                 "time_remaining_ms": engine.current_question.time_remaining_ms,
             })
 
-            await asyncio.sleep(0.1)  # 100ms interval
+            # 5 Hz is plenty for the visible timer and halves WS chatter vs 10 Hz.
+            await asyncio.sleep(0.2)
 
         # Time expired — auto-reveal
         if engine.current_question and engine.status == "active":

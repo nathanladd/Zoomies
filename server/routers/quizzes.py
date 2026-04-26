@@ -19,7 +19,10 @@ def _qq_to_read(qq: QuizQuestion) -> QuizQuestionRead:
         text=q.text, image_filename=q.image_filename,
         correct_answer=q.correct_answer, wrong_answer_1=q.wrong_answer_1,
         wrong_answer_2=q.wrong_answer_2, wrong_answer_3=q.wrong_answer_3,
-        time_seconds=q.time_seconds, created_at=q.created_at,
+        time_seconds=q.time_seconds,
+        randomize_answers=q.randomize_answers,
+        correct_index=q.correct_index,
+        created_at=q.created_at,
         topic_name=q.topic.name if q.topic else None,
     ) if q else None
     return QuizQuestionRead(id=qq.id, question_id=qq.question_id, position=qq.position, question=qr)

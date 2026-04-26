@@ -104,23 +104,17 @@ class QuestionState:
         return self.answers[player_id]
 
     def _display_to_stored(self, display_choice: str) -> str:
-        """Map a display choice back to the original stored answer text."""
+        """Map a display choice (e.g. "B) Newton") back to the raw stored answer text."""
         labels = ["A", "B", "C", "D"]
-        for i, dc in enumerate(self.display_choices):
-            if dc == display_choice:
-                idx = i
-                break
-        else:
-            return display_choice
-
-        answers = [self.correct_answer]
         all_wrong = [c for c in self.all_choices if c != self.correct_answer]
-        answers.extend(all_wrong)
-
         for i, dc in enumerate(self.display_choices):
+            if dc != display_choice:
+                continue
+            label = labels[i] if i < len(labels) else ""
             for ans in [self.correct_answer] + all_wrong:
-                if dc == f"{labels[i]}) {ans}":
+                if dc == f"{label}) {ans}":
                     return ans
+            return display_choice
         return display_choice
 
 

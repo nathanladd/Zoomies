@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Any
 
@@ -47,19 +48,39 @@ class ConnectionManager:
                 self.disconnect_instructor(game_id)
 
     async def broadcast_to_students(self, game_id: int, data: dict[str, Any]) -> None:
+        # Send to every student concurrently. Sequential awaits used to mean
+        # one student on a slow phone connection (TCP send buffer full) would
+        # stall every other send behind it — including the instructor, which
+        # made the projection window lag noticeably during games.
         connections = self.student_connections.get(game_id, {})
-        dead: list[int] = []
-        for pid, ws in connections.items():
+        if not connections:
+            return
+        payload = json.dumps(data)
+        items = list(connections.items())
+
+        async def _send(pid: int, ws: WebSocket) -> int | None:
             try:
-                await ws.send_text(json.dumps(data))
+                await ws.send_text(payload)
+                return None
             except Exception:
-                dead.append(pid)
-        for pid in dead:
-            self.disconnect_student(game_id, pid)
+                return pid
+
+        results = await asyncio.gather(
+            *[_send(pid, ws) for pid, ws in items],
+            return_exceptions=False,
+        )
+        for pid in results:
+            if pid is not None:
+                self.disconnect_student(game_id, pid)
 
     async def broadcast_to_all(self, game_id: int, data: dict[str, Any]) -> None:
-        await self.broadcast_to_students(game_id, data)
-        await self.send_to_instructor(game_id, data)
+        # Fan out to students and the instructor in parallel so the projector
+        # (driven off the instructor socket) never has to wait for the slowest
+        # student before it can update.
+        await asyncio.gather(
+            self.broadcast_to_students(game_id, data),
+            self.send_to_instructor(game_id, data),
+        )
 
     def get_student_count(self, game_id: int) -> int:
         return len(self.student_connections.get(game_id, {}))

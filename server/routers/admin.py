@@ -109,8 +109,21 @@ async def restore_backup(body: RestoreRequest) -> dict[str, str]:
     MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
     # Extract into the user-writable data root (holds data/ and media/questions/).
+    # Validate every entry resolves under USER_DATA_DIR before extracting so a
+    # maliciously crafted zip can't escape with "..\..\foo" paths (Zip-Slip).
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
+            root = USER_DATA_DIR.resolve()
+            for info in zf.infolist():
+                # Reject absolute paths and drive letters outright.
+                name = info.filename
+                if name.startswith(("/", "\\")) or (len(name) > 1 and name[1] == ":"):
+                    raise HTTPException(400, f"Unsafe path in backup: {name}")
+                target = (root / name).resolve()
+                try:
+                    target.relative_to(root)
+                except ValueError:
+                    raise HTTPException(400, f"Unsafe path in backup: {name}")
             zf.extractall(USER_DATA_DIR)
     except zipfile.BadZipFile as e:
         # Roll back the safety move
