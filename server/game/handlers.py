@@ -56,7 +56,7 @@ async def _record_answer_stat(question_id: int, answer_text: str, delta: int = 1
 
 
 async def load_engine(game_id: int, db: AsyncSession) -> GameEngine:
-    """Initialize a Zündpunkt game engine for the given game."""
+    """Initialize a Rudi game engine for the given game."""
     game = await db.get(Game, game_id)
     if not game:
         raise ValueError("Game not found")
@@ -106,7 +106,7 @@ def get_engine(game_id: int) -> GameEngine | None:
 
 
 async def handle_student_ws(ws: WebSocket, game_id: int) -> None:
-    """Handle a student WebSocket connection for Zündpunkt."""
+    """Handle a student WebSocket connection for Rudi."""
     print(f"[WS-STUDENT] Connection attempt for game {game_id}")
     engine = get_engine(game_id)
     if not engine:
@@ -292,7 +292,7 @@ async def _update_game_status(game_id: int, status: str) -> None:
 
 
 async def handle_instructor_ws(ws: WebSocket, game_id: int) -> None:
-    """Handle the instructor WebSocket connection for Zündpunkt."""
+    """Handle the instructor WebSocket connection for Rudi."""
     print(f"[WS-INSTR] Connection attempt for game {game_id}")
     engine = get_engine(game_id)
     if not engine:

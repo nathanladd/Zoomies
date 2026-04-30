@@ -24,9 +24,9 @@ SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 5000
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# Name must match AppMutex in installer/Zundpunkt.iss so Inno Setup can detect
+# Name must match AppMutex in installer/Rudi.iss so Inno Setup can detect
 # a running instance during install/uninstall and offer to close it.
-SINGLETON_MUTEX_NAME = "ZundpunktSingletonMutex"
+SINGLETON_MUTEX_NAME = "RudiSingletonMutex"
 _SINGLETON_MUTEX_HANDLE = None
 
 
@@ -36,7 +36,7 @@ def _acquire_singleton_mutex() -> None:
     The handle is stashed on a module global so Python doesn't GC it — the OS
     releases the mutex automatically when the process exits. Never blocks or
     refuses startup; a pre-existing mutex just means the installer will see
-    "Zündpunkt is running" and prompt the user.
+    "Rudi is running" and prompt the user.
     """
     global _SINGLETON_MUTEX_HANDLE
     if sys.platform != "win32":
@@ -72,7 +72,7 @@ def _wait_for_server(host: str, port: int, timeout_s: float = 15.0) -> bool:
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"Zündpunkt v{__version__}")
+        self.setWindowTitle(f"Rudi v{__version__}")
         self.setMinimumSize(1000, 700)
 
         # Start the backend server BEFORE building tabs (they hit the API on init).
@@ -81,7 +81,7 @@ class MainWindow(QMainWindow):
         if not _wait_for_server(SERVER_HOST, SERVER_PORT, timeout_s=15.0):
             QMessageBox.critical(
                 self, "Server did not start",
-                f"The Zündpunkt server did not come online on port {SERVER_PORT} within 15 seconds.\n\n"
+                f"The Rudi server did not come online on port {SERVER_PORT} within 15 seconds.\n\n"
                 "Check the Server Console on the Game tab for errors, then restart the instructor app.",
             )
 
@@ -102,10 +102,10 @@ class MainWindow(QMainWindow):
         self.server_process = QProcess(self)
         self.server_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         if getattr(sys, "frozen", False):
-            # In a frozen build the installer ships a sibling Zundpunkt-Server.exe
-            # (console subsystem) next to Zundpunkt.exe — see the PyInstaller spec.
+            # In a frozen build the installer ships a sibling Rudi-Server.exe
+            # (console subsystem) next to Rudi.exe — see the PyInstaller spec.
             install_dir = Path(sys.executable).parent
-            server_exe = install_dir / "Zundpunkt-Server.exe"
+            server_exe = install_dir / "Rudi-Server.exe"
             self.server_process.setWorkingDirectory(str(install_dir))
             self.server_process.start(str(server_exe), [])
         else:
@@ -306,7 +306,7 @@ class MainWindow(QMainWindow):
 
     def _backup_database(self):
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        default = str(Path.home() / f"zundpunkt-{stamp}.zip")
+        default = str(Path.home() / f"rudi-{stamp}.zip")
         path, _ = QFileDialog.getSaveFileName(
             self, "Save Backup As", default, "Zip archives (*.zip)",
         )
@@ -395,7 +395,7 @@ class MainWindow(QMainWindow):
 
 def main():
     # Claim the named mutex before anything heavy so a parallel installer run
-    # can see "Zündpunkt is running" as soon as possible.
+    # can see "Rudi is running" as soon as possible.
     _acquire_singleton_mutex()
 
     app = QApplication(sys.argv)

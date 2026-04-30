@@ -1,12 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec for Zündpunkt.
+"""PyInstaller spec for Rudi.
 
-Produces a single one-dir bundle (dist/Zundpunkt/) with Zundpunkt.exe as the
+Produces a single one-dir bundle (dist/Rudi/) with Rudi.exe as the
 entry point. The same executable dispatches to either the instructor GUI or
 the FastAPI server based on argv (see entry.py).
 
 Build with:
-    pyinstaller Zundpunkt.spec --noconfirm --clean
+    pyinstaller Rudi.spec --noconfirm --clean
 """
 import sys
 from pathlib import Path
@@ -84,7 +84,7 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-_icon = PROJECT_ROOT / "installer" / "zundpunkt.ico"
+_icon = PROJECT_ROOT / "installer" / "rudi.ico"
 _icon_arg = str(_icon) if _icon.exists() else None
 
 # Instructor GUI: windowless (no console window flashing on startup).
@@ -93,7 +93,7 @@ exe_gui = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="Zundpunkt",
+    name="Rudi",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -116,7 +116,7 @@ exe_server = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="Zundpunkt-Server",
+    name="Rudi-Server",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -140,5 +140,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="Zundpunkt",
+    name="Rudi",
 )

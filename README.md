@@ -1,8 +1,8 @@
-# Zündpunkt
+# Rudi
 
-*The ignition point — the moment pressure and fuel combine and something useful happens.*
+*Named for Rudolf Christian Karl Diesel — the engineer whose spark of an idea still drives us forward.*
 
-Zündpunkt is a classroom quiz game. Students join from their own browsers on the local network; the instructor runs one question at a time with a live timer, progressive answer elimination, and continuous scoring. A projection window shows the current question to the whole room while each student sees the answer choices on their own device.
+Rudi is a classroom quiz game. Students join from their own browsers on the local network; the instructor runs one question at a time with a live timer, progressive answer elimination, and continuous scoring. A projection window shows the current question to the whole room while each student sees the answer choices on their own device.
 
 ## Quick Start
 
@@ -18,7 +18,7 @@ pip install -r requirements.txt
 python run_server.py
 ```
 
-The server runs at `http://localhost:5000`. The SQLite database (`data/zundpunkt.db`) and media folder are created automatically on first launch.
+The server runs at `http://localhost:5000`. The SQLite database (`data/rudi.db`) and media folder are created automatically on first launch. If you are upgrading from a pre-rename install, the old `data/zundpunkt.db` is renamed in place on first launch.
 
 ### 3. Launch the instructor app
 
@@ -43,7 +43,7 @@ Students open a browser and navigate to `http://<instructor-ip>:5000`, enter the
 ## Project Structure
 
 ```
-Zündpunkt/
+Rudi/
 ├── server/              # FastAPI backend
 │   ├── main.py          # App entry point
 │   ├── config.py        # Settings + DB path

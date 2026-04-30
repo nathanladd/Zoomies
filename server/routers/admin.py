@@ -52,7 +52,7 @@ async def create_backup(path: str | None = None) -> BackupResult:
         out_zip = Path(path)
         out_zip.parent.mkdir(parents=True, exist_ok=True)
     else:
-        out_zip = BACKUPS_DIR / f"zundpunkt-{stamp}.zip"
+        out_zip = BACKUPS_DIR / f"rudi-{stamp}.zip"
 
     # Copy the DB via the online backup API into a temp file first so we zip
     # a consistent snapshot even if writes happen during the zip.

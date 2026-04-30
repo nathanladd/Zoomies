@@ -9,7 +9,7 @@ from version import __version__
 
 
 class ProjectionWindow(QWidget):
-    """Fullscreen projection display for Zündpunkt games.
+    """Fullscreen projection display for Rudi games.
 
     Shows question text, optional image, timer, answer count, and leaderboard.
     Answer choices are NOT shown here — students see them on their own devices.
@@ -20,7 +20,7 @@ class ProjectionWindow(QWidget):
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.game_id = game_id
         self.server_port = server_port
-        self.setWindowTitle(f"Zündpunkt v{__version__} — Projection")
+        self.setWindowTitle(f"Rudi v{__version__} — Projection")
         self.setMinimumSize(1024, 700)
         self.setStyleSheet("background-color: #0f172a; color: white;")
 
@@ -278,11 +278,11 @@ class ProjectionWindow(QWidget):
             )
         self.question_label.setText(
             f'<div style="text-align:center;">'
-            f'<div style="font-size:64px; font-weight:bold; color:#818cf8; margin-bottom:12px; letter-spacing:2px;">ZÜNDPUNKT</div>'
+            f'<div style="font-size:64px; font-weight:bold; color:#818cf8; margin-bottom:12px; letter-spacing:2px;">RUDI</div>'
             f'<div style="font-size:18px; font-style:italic; color:#cbd5e1; margin-bottom:6px; line-height:1.4;">'
-            f'Zündpunkt &mdash; the ignition point &mdash; the moment pressure and fuel combine and something useful happens.'
+            f'Named for Rudolf Christian Karl Diesel &mdash; the engineer whose spark of an idea still drives us forward.'
             f'</div>'
-            f'<div style="font-size:15px; color:#94a3b8; margin-bottom:14px;">(What I think Rudolf Diesel would call this game.)</div>'
+            f'<div style="font-size:15px; color:#94a3b8; margin-bottom:14px;">A classroom quiz game.</div>'
             f'<div style="font-size:17px; font-style:italic; color:#fbbf24; margin-bottom:24px;">'
             f'&ldquo;Do not fear failure, but rather fear not trying at all.&rdquo; &mdash; Rudolf Diesel'
             f'</div>'

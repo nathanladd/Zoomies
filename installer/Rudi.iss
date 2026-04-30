@@ -1,8 +1,8 @@
-; Inno Setup script for Zündpunkt
+; Inno Setup script for Rudi
 ; -----------------------------------------------------------------------------
-; Build the PyInstaller bundle first (pyinstaller Zundpunkt.spec), then compile
+; Build the PyInstaller bundle first (pyinstaller Rudi.spec), then compile
 ; this script with:
-;   ISCC.exe /DAppVersion=0.2.0 installer\Zundpunkt.iss
+;   ISCC.exe /DAppVersion=0.2.0 installer\Rudi.iss
 ; The build.ps1 wrapper reads version.py and passes /DAppVersion automatically.
 ; -----------------------------------------------------------------------------
 
@@ -10,11 +10,11 @@
   #define AppVersion "0.0.0"
 #endif
 
-#define AppName         "Zundpunkt"
-#define AppDisplayName  "Zündpunkt"
+#define AppName         "Rudi"
+#define AppDisplayName  "Rudi"
 #define AppPublisher    "Nathan Ladd"
 #define AppURL          "https://github.com/nathanladd/Zundpunkt"
-#define AppExeName      "Zundpunkt.exe"
+#define AppExeName      "Rudi.exe"
 
 [Setup]
 AppId={{7A5E3FB2-2C6E-4E4A-9CBF-9D3D5F44A4A8}
@@ -29,9 +29,9 @@ DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppDisplayName}
 DisableProgramGroupPage=yes
 OutputDir=..\dist\installer
-OutputBaseFilename=Zundpunkt-Setup-{#AppVersion}
-#if FileExists(AddBackslash(SourcePath) + "zundpunkt.ico")
-SetupIconFile={#SourcePath}\zundpunkt.ico
+OutputBaseFilename=Rudi-Setup-{#AppVersion}
+#if FileExists(AddBackslash(SourcePath) + "rudi.ico")
+SetupIconFile={#SourcePath}\rudi.ico
 #endif
 UninstallDisplayIcon={app}\{#AppExeName}
 Compression=lzma2/ultra
@@ -42,11 +42,11 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=dialog
-; If Zundpunkt.exe is running during install/uninstall, Inno Setup checks for
+; If Rudi.exe is running during install/uninstall, Inno Setup checks for
 ; this named mutex and offers to close the running instance (and restart it
 ; after the upgrade when possible). The instructor app creates the mutex at
 ; startup — see instructor/main.py _acquire_singleton_mutex.
-AppMutex=ZundpunktSingletonMutex
+AppMutex=RudiSingletonMutex
 CloseApplications=yes
 RestartApplications=yes
 
@@ -58,8 +58,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "firewall";    Description: "Allow {#AppDisplayName} through the Windows firewall (port 5000)"; GroupDescription: "Networking:"; Flags: unchecked
 
 [Files]
-; Entire PyInstaller one-dir bundle (dist/Zundpunkt/*) goes into {app}.
-Source: "..\dist\Zundpunkt\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+; Entire PyInstaller one-dir bundle (dist/Rudi/*) goes into {app}.
+Source: "..\dist\Rudi\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#AppDisplayName}"; Filename: "{app}\{#AppExeName}"
@@ -75,7 +75,7 @@ Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppDisplayNam
 Filename: "netsh.exe"; Parameters: "advfirewall firewall delete rule name=""{#AppDisplayName}"""; Flags: runhidden; RunOnceId: "RemoveFirewallRule"
 
 [UninstallDelete]
-; %LOCALAPPDATA%\Zundpunkt holds the DB, uploaded media, and backups. Leave
+; %LOCALAPPDATA%\Rudi holds the DB, uploaded media, and backups. Leave
 ; it alone by default so a reinstall/upgrade keeps question content, and let
 ; the user decide what to purge via a dedicated prompt below.
 Type: filesandordirs; Name: "{app}"
@@ -86,10 +86,10 @@ var
   UserData: String;
 begin
   if CurUninstallStep = usPostUninstall then begin
-    UserData := ExpandConstant('{localappdata}\Zundpunkt');
+    UserData := ExpandConstant('{localappdata}\Rudi');
     if DirExists(UserData) then begin
       if MsgBox(
-            'Also delete Zündpunkt user data (question database, uploaded images, backups)?' + Chr(13) + Chr(10) +
+            'Also delete Rudi user data (question database, uploaded images, backups)?' + Chr(13) + Chr(10) +
             Chr(13) + Chr(10) +
             UserData + Chr(13) + Chr(10) +
             Chr(13) + Chr(10) +

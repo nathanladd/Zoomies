@@ -1,7 +1,7 @@
-# ZÜNDPUNKT — Classroom Quiz Game
+# RUDI — Classroom Quiz Game
 
-**Zündpunkt** — *the ignition point — the moment pressure and heat combine and something useful happens.*
-(What I think Rudolf Diesel would call this game.)
+**Rudi** — *named for Rudolf Christian Karl Diesel, the engineer whose spark of an idea still drives us forward.*
+(Originally shipped as **Zündpunkt**; renamed to Rudi in 0.5.x.)
 
 **Version:** 3.0
 **Platform:** Windows
@@ -13,20 +13,20 @@
 
 ## 1.1 What it is
 
-Zündpunkt is a single-purpose classroom quiz game for a local intranet. The instructor runs the app, projects one question at a time, and students join from their own browsers with just a name. Each question has a live countdown, progressive elimination of wrong answers, and a continuous point decay that rewards fast answers without leaving slower players too far behind. When the quiz ends, a leaderboard is shown; that's it.
+Rudi is a single-purpose classroom quiz game for a local intranet. The instructor runs the app, projects one question at a time, and students join from their own browsers with just a name. Each question has a live countdown, progressive elimination of wrong answers, and a continuous point decay that rewards fast answers without leaving slower players too far behind. When the quiz ends, a leaderboard is shown; that's it.
 
 ## 1.2 What changed from the old design
 
-This project was previously split into a "Cognit" platform shell and a "PointDrop" game module with post-game analytics (per-question aggregation, student history across sessions, etc.). Those have been collapsed into a single product called **Zündpunkt**, and analytics have been removed in favor of an in-game leaderboard only.
+This project was previously split into a "Cognit" platform shell and a "PointDrop" game module with post-game analytics (per-question aggregation, student history across sessions, etc.). Those have been collapsed into a single product — first shipped as **Zündpunkt**, now renamed to **Rudi** — and analytics have been removed in favor of an in-game leaderboard only.
 
 Concretely:
 
-- One product name, one set of menus: **Zündpunkt**.
+- One product name, one set of menus: **Rudi** (formerly Zündpunkt).
 - **No post-game analytics.** The `Answer` table, the `/api/results/*` endpoints, and the *Results* tab in the instructor app are gone.
 - **Simpler session schema.** `GameSession.game_type` and `GameSession.current_q_index` are removed. There is only one game.
 - **Flattened code layout.** `server/games/pointdrop/` → `server/game/`, `instructor/games/pointdrop/` → `instructor/game/`, `static/pointdrop/` → `static/game/`.
 - **Renamed "Display" window → "Projection" window** throughout the instructor app.
-- **Database filename:** `cognit.db` → `zundpunkt.db`.
+- **Database filename:** `cognit.db` → `zundpunkt.db` → `rudi.db` (legacy files are renamed in place on first launch).
 - **Route rename:** `/pointdrop` → `/play`.
 - **Backup / restore** of the question database is now a built-in feature (see §12).
 
@@ -93,7 +93,7 @@ Concretely:
 # 4. Project Structure
 
 ```
-Zündpunkt/
+Rudi/
 │
 ├── server/
 │   ├── __init__.py
@@ -144,7 +144,7 @@ Zündpunkt/
 │   └── questions/                 # Uploaded question images
 │
 ├── data/
-│   └── zundpunkt.db               # SQLite database (auto-created)
+│   └── rudi.db                    # SQLite database (auto-created)
 │
 ├── backups/                       # Backup zip archives (auto-created)
 │
@@ -424,7 +424,7 @@ Correct answer is never eliminated. Students who have already answered see no ch
 
 ## 8.1 Student flow
 
-- **Join page** (`/`): big `ZÜNDPUNKT` banner, tagline, name + session number fields, "Join Game" button.
+- **Join page** (`/`): big `RUDI` banner, tagline, name + session number fields, "Join Game" button.
 - **Game page** (`/play?session=…&name=…`): waiting → question → locked → result → final leaderboard. WebSocket-driven, one screen active at a time.
 
 ## 8.2 Projection window (instructor)
@@ -433,9 +433,9 @@ The projection window is what the classroom sees. Frameless, dark background, `b
 
 **Waiting screen contents (top → bottom):**
 
-1. `ZÜNDPUNKT` header (large, indigo, with glow).
-2. Italic tagline: *Zündpunkt — the ignition point — the moment pressure and heat combine and something useful happens.*
-3. Smaller dim caption: *(What I think Rudolf Diesel would call this game.)*
+1. `RUDI` header (large, indigo, with glow).
+2. Italic tagline: *Named for Rudolf Christian Karl Diesel — the engineer whose spark of an idea still drives us forward.*
+3. Smaller dim caption: *A classroom quiz game.*
 4. "Join at" + local IP + port.
 5. Session number.
 6. Player count + the joined names.
@@ -528,7 +528,7 @@ The database is small and irreplaceable once quizzes have been authored. Backing
 
 ## 12.1 What gets backed up
 
-- `data/zundpunkt.db` — the SQLite file (topics, questions, quizzes, quiz_questions, game_sessions, players).
+- `data/rudi.db` — the SQLite file (topics, questions, quizzes, quiz_questions, game_sessions, players).
 - `media/questions/` — image files referenced by `Question.image_filename`.
 
 Both must be bundled together; image filenames in the DB are useless without the files and vice versa.
@@ -536,9 +536,9 @@ Both must be bundled together; image filenames in the DB are useless without the
 ## 12.2 Backup zip layout
 
 ```
-zundpunkt-<timestamp>.zip
+rudi-<timestamp>.zip
 ├── data/
-│   └── zundpunkt.db
+│   └── rudi.db
 └── media/
     └── questions/
         ├── q_001_*.png
@@ -549,7 +549,7 @@ zundpunkt-<timestamp>.zip
 
 **Instructor app → Database menu → Backup Database…**
 
-1. Instructor picks a destination zip path (default: `~/zundpunkt-<timestamp>.zip`).
+1. Instructor picks a destination zip path (default: `~/rudi-<timestamp>.zip`).
 2. Instructor GUI calls `POST /api/admin/backup?path=<chosen>`.
 3. Server:
    - Uses SQLite's online backup API (`sqlite3.Connection.backup(dst_conn)`) to copy the DB to a temp file without blocking writes.
@@ -557,7 +557,7 @@ zundpunkt-<timestamp>.zip
    - Returns `{path, size_bytes, created_at}`.
 4. Instructor GUI shows a confirmation with the size.
 
-If no `path` query is provided, the server writes to `backups/zundpunkt-<timestamp>.zip` under the project root.
+If no `path` query is provided, the server writes to `backups/rudi-<timestamp>.zip` under the project root.
 
 ## 12.4 In-app restore
 
@@ -567,7 +567,7 @@ If no `path` query is provided, the server writes to `backups/zundpunkt-<timesta
 2. Instructor picks a backup zip.
 3. Instructor GUI calls `POST /api/admin/restore` with `{path}`.
 4. Server:
-   - Moves the current `data/zundpunkt.db` and `media/questions/` into `data/pre-restore-<timestamp>/` so the previous state is recoverable.
+   - Moves the current `data/rudi.db` and `media/questions/` into `data/pre-restore-<timestamp>/` so the previous state is recoverable.
    - Extracts the zip over `data/` and `media/questions/`.
    - Returns `{status, restored_from, previous_state, notice}` telling the instructor to **restart the server** (the running SQLAlchemy engine is still holding the old file handle).
 5. Instructor GUI shows the restart instruction.
@@ -582,9 +582,9 @@ Use this when the app isn't running or the user prefers a command-line workflow.
 
 ```powershell
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$dest  = "backups\zundpunkt-$stamp"
+$dest  = "backups\rudi-$stamp"
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
-Copy-Item "data\zundpunkt.db" "$dest\zundpunkt.db"
+Copy-Item "data\rudi.db" "$dest\rudi.db"
 Copy-Item "media\questions"  "$dest\questions" -Recurse
 Compress-Archive -Path "$dest\*" -DestinationPath "$dest.zip"
 ```
@@ -593,13 +593,13 @@ Compress-Archive -Path "$dest\*" -DestinationPath "$dest.zip"
 
 ```powershell
 # Stop the server first!
-Expand-Archive -Path "backups\zundpunkt-<timestamp>.zip" -DestinationPath "."
+Expand-Archive -Path "backups\rudi-<timestamp>.zip" -DestinationPath "."
 # Then start the server again.
 ```
 
 ## 12.6 Optional: rotating auto-backup
 
-Not implemented yet. Intended behavior: on server startup, if `backups/auto/zundpunkt-<YYYYMMDD>.db` doesn't exist for today, create it via the online backup API; keep the 14 most-recent daily files, delete older ones. Add as a small task in `server/main.py` lifespan.
+Not implemented yet. Intended behavior: on server startup, if `backups/auto/rudi-<YYYYMMDD>.db` doesn't exist for today, create it via the online backup API; keep the 14 most-recent daily files, delete older ones. Add as a small task in `server/main.py` lifespan.
 
 ---
 
@@ -612,9 +612,9 @@ Not implemented yet. Intended behavior: on server startup, if `backups/auto/zund
 | Session REST API (simplified, no game_type) | Done |
 | Instructor PyQt6 app (Topics/Questions/Quizzes/Game tabs) | Done |
 | Game engine (elimination + √-decay scoring) | Done |
-| Projection window with Zündpunkt tagline + F11 hint | Done |
+| Projection window with Rudi tagline + F11 hint | Done |
 | Student web UI (join + play + results) | Done |
-| Zündpunkt rename migration | Done |
+| Zündpunkt → Rudi rename migration | Done |
 | Removal of Answer table + Results tab + analytics endpoints | Done |
 | `/api/admin/backup` + `/api/admin/restore` | Done |
 | Instructor Database menu (Backup / Restore) | Done |
@@ -624,4 +624,4 @@ Not implemented yet. Intended behavior: on server startup, if `backups/auto/zund
 
 # 14. Summary
 
-Zündpunkt is the ignition point — press, start a quiz, fire. One product, one name, one database, one game mode. Students on their own screens, the projection on the wall, live scoring that still cares about speed without punishing the slower half of the class, and a backup button in the menu so you never lose the quizzes you authored.
+Rudi is a tribute to Rudolf Diesel — press, start a quiz, fire. One product, one name, one database, one game mode. Students on their own screens, the projection on the wall, live scoring that still cares about speed without punishing the slower half of the class, and a backup button in the menu so you never lose the quizzes you authored.

@@ -10,7 +10,7 @@ from server.game.elimination import build_elimination_schedule, get_elimination_
 
 
 class QuestionState:
-    """Runtime state for a single question during a Zündpunkt game."""
+    """Runtime state for a single question during a Rudi game."""
 
     def __init__(
         self,
@@ -119,7 +119,7 @@ class QuestionState:
 
 
 class GameEngine(BaseGame):
-    """Zündpunkt game state machine."""
+    """Rudi game state machine."""
 
     def __init__(
         self,

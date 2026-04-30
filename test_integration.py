@@ -1,4 +1,4 @@
-"""End-to-end integration test for Zündpunkt API. Run with: python test_integration.py"""
+"""End-to-end integration test for Rudi API. Run with: python test_integration.py"""
 import httpx
 import sys
 

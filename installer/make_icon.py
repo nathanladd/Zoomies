@@ -1,8 +1,8 @@
-"""Generate installer/zundpunkt.ico — stdlib-only placeholder.
+"""Generate installer/rudi.ico — stdlib-only placeholder.
 
 Writes a single 32x32 solid-color .ico directly using the raw ICO + BITMAPINFOHEADER
 format, with no external dependencies. It's ugly but valid; swap in a designed
-icon at installer/zundpunkt.ico whenever you have one (the spec and .iss both
+icon at installer/rudi.ico whenever you have one (the spec and .iss both
 pick up whatever file is there).
 
 Run from the project root:
@@ -14,7 +14,7 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parent / "zundpunkt.ico"
+OUT = Path(__file__).resolve().parent / "rudi.ico"
 
 SIZE = 32
 # Flat slate-navy background with a yellow diagonal lightning-ish stripe so the

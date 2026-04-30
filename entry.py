@@ -1,10 +1,10 @@
-"""Unified entry point for the frozen Zündpunkt executable.
+"""Unified entry point for the frozen Rudi executable.
 
-The same Zundpunkt.exe dispatches two roles based on argv:
+The same Rudi.exe dispatches two roles based on argv:
 
-    Zundpunkt.exe            → launches the PyQt6 instructor app (which in
-                                turn spawns the server as a child process)
-    Zundpunkt.exe --server   → runs the FastAPI/uvicorn server in-process
+    Rudi.exe            → launches the PyQt6 instructor app (which in
+                           turn spawns the server as a child process)
+    Rudi.exe --server   → runs the FastAPI/uvicorn server in-process
 
 In dev mode run_instructor.py and run_server.py are used directly; this file
 is only picked up by the PyInstaller spec.
@@ -38,7 +38,7 @@ def _is_server_role() -> bool:
     if "--server" in sys.argv[1:]:
         return True
     # Otherwise the exe name decides the role in a frozen build, so a single
-    # spec can emit two EXEs (Zundpunkt.exe + Zundpunkt-Server.exe) that share
+    # spec can emit two EXEs (Rudi.exe + Rudi-Server.exe) that share
     # the same Analysis/PYZ.
     return "server" in Path(sys.executable).stem.lower()
 

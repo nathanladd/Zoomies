@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Zündpunkt", version=__version__, lifespan=lifespan)
+app = FastAPI(title="Rudi", version=__version__, lifespan=lifespan)
 
 # Static web UI is bundled read-only (BASE_DIR = _MEIPASS in frozen mode;
 # project root in dev). Uploaded media lives under USER_DATA_DIR/media which
