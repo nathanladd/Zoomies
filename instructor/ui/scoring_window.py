@@ -14,8 +14,11 @@ import math
 from PyQt6.QtCore import Qt, QPointF, QRectF
 from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPainterPath, QPen, QPolygonF
 from PyQt6.QtWidgets import (
-    QDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget,
+    QDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QTabWidget,
+    QVBoxLayout, QWidget,
 )
+
+from instructor.core.topic_manager import TopicManager
 
 
 POINTS_MAX = 1000
@@ -297,12 +300,12 @@ class CurveEditor(QWidget):
         self.update()
 
 
-class ScoringAdjustmentWindow(QDialog):
+class ScoringPanel(QWidget):
+    """Scoring curve + elimination-mark editor as an embeddable widget."""
+
     def __init__(self, api, parent: QWidget | None = None):
         super().__init__(parent)
         self.api = api
-        self.setWindowTitle("Scoring Adjustment")
-        self.resize(820, 540)
 
         self.hint = QLabel(
             "Drag the green handles to reshape how points are awarded. "
@@ -322,14 +325,12 @@ class ScoringAdjustmentWindow(QDialog):
         self.flat_btn = QPushButton("Preset: Close Scores")
         self.linear_btn = QPushButton("Preset: Linear")
         self.save_btn = QPushButton("Save")
-        self.close_btn = QPushButton("Close")
         self.save_btn.setDefault(True)
         btns.addWidget(self.reset_btn)
         btns.addWidget(self.flat_btn)
         btns.addWidget(self.linear_btn)
         btns.addStretch()
         btns.addWidget(self.save_btn)
-        btns.addWidget(self.close_btn)
 
         root = QVBoxLayout(self)
         root.addWidget(self.hint)
@@ -340,7 +341,6 @@ class ScoringAdjustmentWindow(QDialog):
         self.flat_btn.clicked.connect(self._preset_close)
         self.linear_btn.clicked.connect(self._preset_linear)
         self.save_btn.clicked.connect(self._save)
-        self.close_btn.clicked.connect(self.close)
 
         self._load_from_server()
 
@@ -394,3 +394,36 @@ class ScoringAdjustmentWindow(QDialog):
             "Scoring curve and elimination timing saved. "
             "Applies to the next question (no restart needed).",
         )
+
+
+class SettingsWindow(QDialog):
+    """Tabbed settings dialog: Topics + Scoring."""
+
+    TAB_TOPICS = 0
+    TAB_SCORING = 1
+
+    def __init__(self, api, parent: QWidget | None = None, initial_tab: int = 0):
+        super().__init__(parent)
+        self.api = api
+        self.setWindowTitle("Settings")
+        self.resize(900, 600)
+
+        self.tabs = QTabWidget(self)
+        self.topic_manager = TopicManager(api)
+        self.scoring_panel = ScoringPanel(api)
+        self.tabs.addTab(self.topic_manager, "Topics")
+        self.tabs.addTab(self.scoring_panel, "Scoring")
+        self.tabs.setCurrentIndex(initial_tab)
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+        bottom = QHBoxLayout()
+        bottom.addStretch()
+        bottom.addWidget(close_btn)
+
+        root = QVBoxLayout(self)
+        root.addWidget(self.tabs, 1)
+        root.addLayout(bottom)
+
+    def show_tab(self, index: int) -> None:
+        self.tabs.setCurrentIndex(index)

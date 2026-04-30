@@ -648,6 +648,10 @@ class QuestionDialog(QDialog):
 
 
 class QuestionPool(QWidget):
+    # Emitted when the instructor clicks the "Topics…" toolbar button so
+    # MainWindow can open the Settings dialog on the Topics tab.
+    topics_requested = pyqtSignal()
+
     def __init__(self, api: ApiClient):
         super().__init__()
         self.api = api
@@ -665,6 +669,9 @@ class QuestionPool(QWidget):
         self.btn_edit.clicked.connect(self.edit_question)
         self.btn_delete = QPushButton("Delete")
         self.btn_delete.clicked.connect(self.delete_question)
+        self.btn_topics = QPushButton("Topics…")
+        self.btn_topics.setToolTip("Manage topics in Settings")
+        self.btn_topics.clicked.connect(self.topics_requested)
         self.btn_refresh = QPushButton("Refresh")
         self.btn_refresh.clicked.connect(self.refresh)
 
@@ -695,6 +702,7 @@ class QuestionPool(QWidget):
         toolbar.addWidget(self.btn_add)
         toolbar.addWidget(self.btn_edit)
         toolbar.addWidget(self.btn_delete)
+        toolbar.addWidget(self.btn_topics)
         toolbar.addStretch()
         toolbar.addWidget(QLabel("Sort:"))
         toolbar.addWidget(self.sort_combo)

@@ -13,11 +13,10 @@ from PyQt6.QtCore import Qt, QProcess
 from PyQt6.QtGui import QAction
 
 from instructor.api_client import ApiClient
-from instructor.core.topic_manager import TopicManager
 from instructor.core.question_pool import QuestionPool
 from instructor.core.quiz_builder import QuizBuilder
 from instructor.game.control_panel import GameControlPanel, kill_port_processes
-from instructor.ui.scoring_window import ScoringAdjustmentWindow
+from instructor.ui.scoring_window import SettingsWindow
 from version import __version__
 
 SERVER_HOST = "127.0.0.1"
@@ -128,9 +127,12 @@ class MainWindow(QMainWindow):
 
     def _build_ui(self):
         # Tabs for content management
-        self.topic_mgr = TopicManager(self.api)
         self.question_pool = QuestionPool(self.api)
         self.quiz_builder = QuizBuilder(self.api)
+        # Topics now live in the Settings dialog; the Question pool exposes a
+        # button that asks us to open it on the Topics tab.
+        if hasattr(self.question_pool, "topics_requested"):
+            self.question_pool.topics_requested.connect(self._open_topics_settings)
 
         # Game panel is the main window's central widget
         self.game_panel = GameControlPanel(self.api, server_process=self.server_process)
@@ -138,21 +140,18 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.game_panel)
 
         # Dock widgets for authoring tools
-        self.dock_topics = self._make_dock("Topics", self.topic_mgr)
         self.dock_questions = self._make_dock("Questions", self.question_pool)
         self.dock_quizzes = self._make_dock("Quiz Builder", self.quiz_builder)
 
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_topics)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_questions)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_quizzes)
         # Stack them as tabs in the same dock area to save space
-        self.tabifyDockWidget(self.dock_topics, self.dock_questions)
         self.tabifyDockWidget(self.dock_questions, self.dock_quizzes)
-        self.dock_topics.raise_()
+        self.dock_questions.raise_()
 
         # Start with all authoring docks hidden so the Game panel has full space;
         # the View menu lets the instructor show them on demand.
-        for dock in (self.dock_topics, self.dock_questions, self.dock_quizzes):
+        for dock in (self.dock_questions, self.dock_quizzes):
             dock.hide()
 
         # Right-side dockable runtime panels: Leaderboard, Server Console,
@@ -189,7 +188,7 @@ class MainWindow(QMainWindow):
     def _apply_default_view(self):
         """Canonical layout: left authoring docks hidden, right runtime docks
         visible and sized in equal thirds."""
-        for dock in (self.dock_topics, self.dock_questions, self.dock_quizzes):
+        for dock in (self.dock_questions, self.dock_quizzes):
             dock.hide()
         right_docks = (
             self.dock_leaderboard,
@@ -243,6 +242,12 @@ class MainWindow(QMainWindow):
 
         file_menu.addSeparator()
 
+        settings_action = QAction("&Settings\u2026", self)
+        settings_action.triggered.connect(self._open_settings)
+        file_menu.addAction(settings_action)
+
+        file_menu.addSeparator()
+
         quit_action = QAction("&Quit", self)
         quit_action.setShortcut("Ctrl+Q")
         quit_action.triggered.connect(self.close)
@@ -250,7 +255,7 @@ class MainWindow(QMainWindow):
 
         # View menu — dock visibility toggles + projection window toggle
         view_menu = menubar.addMenu("&View")
-        for dock in (self.dock_topics, self.dock_questions, self.dock_quizzes):
+        for dock in (self.dock_questions, self.dock_quizzes):
             action = dock.toggleViewAction()  # checkable, auto-synced with the dock
             view_menu.addAction(action)
 
@@ -289,20 +294,13 @@ class MainWindow(QMainWindow):
         # Database menu
         db_menu = menubar.addMenu("&Database")
 
-        backup_action = QAction("&Backup Database…", self)
+        backup_action = QAction("&Backup Database\u2026", self)
         backup_action.triggered.connect(self._backup_database)
         db_menu.addAction(backup_action)
 
-        restore_action = QAction("&Restore Database…", self)
+        restore_action = QAction("&Restore Database\u2026", self)
         restore_action.triggered.connect(self._restore_database)
         db_menu.addAction(restore_action)
-
-        # Settings menu
-        settings_menu = menubar.addMenu("&Settings")
-
-        scoring_action = QAction("&Scoring Adjustment…", self)
-        scoring_action.triggered.connect(self._open_scoring_settings)
-        settings_menu.addAction(scoring_action)
 
     def _backup_database(self):
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -351,9 +349,18 @@ class MainWindow(QMainWindow):
             f"{result.get('notice', '')}",
         )
 
-    def _open_scoring_settings(self):
-        dlg = ScoringAdjustmentWindow(self.api, self)
+    def _open_settings(self, initial_tab: int = SettingsWindow.TAB_TOPICS):
+        dlg = SettingsWindow(self.api, self, initial_tab=initial_tab)
         dlg.exec()
+        # Topic edits may affect the Questions panel's topic filter and any
+        # topic-name cells; refresh once the dialog closes.
+        try:
+            self.question_pool.refresh()
+        except Exception:
+            pass
+
+    def _open_topics_settings(self):
+        self._open_settings(SettingsWindow.TAB_TOPICS)
 
     def _restart_server(self):
         """Stop the current server QProcess, then start a fresh one and
