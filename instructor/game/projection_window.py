@@ -252,7 +252,7 @@ class ProjectionWindow(QWidget):
             local_ip = socket.gethostbyname(hostname)
         except Exception:
             local_ip = "localhost"
-        self._join_url = f"http://{local_ip}:{self.server_port}"
+        self._join_url = f"{local_ip}:{self.server_port}"
 
         self.question_label.setTextFormat(Qt.TextFormat.RichText)
         self.question_label.setSizePolicy(
@@ -280,7 +280,7 @@ class ProjectionWindow(QWidget):
             f'<div style="text-align:center;">'
             f'<div style="font-size:64px; font-weight:bold; color:#818cf8; margin-bottom:12px; letter-spacing:2px;">RUDI</div>'
             f'<div style="font-size:18px; font-style:italic; color:#cbd5e1; margin-bottom:6px; line-height:1.4;">'
-            f'Named for Rudolf Christian Karl Diesel &mdash; the engineer whose spark of an idea still drives us forward.'
+            f'Named for Rudolf Christian Karl Diesel &mdash.'
             f'</div>'
             f'<div style="font-size:15px; color:#94a3b8; margin-bottom:14px;">A classroom quiz game.</div>'
             f'<div style="font-size:17px; font-style:italic; color:#fbbf24; margin-bottom:24px;">'
