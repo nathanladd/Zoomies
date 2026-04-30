@@ -1,8 +1,8 @@
-# Zündpunkt
+# Rudi
 
-*The ignition point — the moment pressure and fuel combine and something useful happens.*
+*Rudi - What I would think friends called Rudolph Christian, Karl Diesel (The inventopr of the diesel engine)*
 
-Zündpunkt is a classroom quiz game. Students join from their own browsers on the local network; the instructor runs one question at a time with a live timer, progressive answer elimination, and continuous scoring. A projection window shows the current question to the whole room while each student sees the answer choices on their own device.
+Rudi is a classroom quiz game. Students join from their own browsers on the local network; the instructor runs one question at a time with a live timer, progressive answer elimination, and continuous scoring. A projection window shows the current question to the whole room while each student sees the answer choices on their own device.
 
 ## Quick Start
 
