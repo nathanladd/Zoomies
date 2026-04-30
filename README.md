@@ -1,6 +1,10 @@
 # Rudi
 
+<<<<<<< HEAD
 *Named for Rudolf Christian Karl Diesel — the engineer whose spark of an idea still drives us forward.*
+=======
+*Rudi - What I would think friends called Rudolph Christian, Karl Diesel (The inventopr of the diesel engine)*
+>>>>>>> 7304b35f9aac8beab15f8b13eeec08748a837a41
 
 Rudi is a classroom quiz game. Students join from their own browsers on the local network; the instructor runs one question at a time with a live timer, progressive answer elimination, and continuous scoring. A projection window shows the current question to the whole room while each student sees the answer choices on their own device.
 
