@@ -10,7 +10,6 @@ from PyQt6.QtWidgets import (
     QHeaderView, QPlainTextEdit, QSplitter,
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QProcess, QObject
-from PyQt6.QtGui import QTextCursor
 
 from instructor.api_client import ApiClient
 from instructor.game.projection_window import ProjectionWindow
@@ -166,9 +165,6 @@ class GameControlPanel(QWidget):
         # Cleared on every new question_start and on game_end.
         self._answer_status: dict[int, bool] = {}
         self._server_process = server_process  # owned by MainWindow
-        # Spinner state for collapsing points_update log lines
-        self._points_spinner_idx = 0
-        self._points_line_active = False
         self._build_ui()
         # Marshal background-thread stat results back onto the GUI thread.
         self._stats_loaded.connect(self._on_stats_loaded)
@@ -531,7 +527,6 @@ class GameControlPanel(QWidget):
             remaining = msg.get("time_remaining_ms", 0)
             secs = remaining / 1000
             self.time_label.setText(f"Time: {secs:.1f}s | Pts: {msg.get('current_points', 0)}")
-            self._log_points_tick()
 
         elif msg_type == "player_answered":
             pid = msg.get("player_id")
@@ -791,33 +786,10 @@ class GameControlPanel(QWidget):
         sys.stdout = self._log_stream
 
     def _append_instructor_log(self, text: str):
-        # Any unrelated log output breaks the points_update spinner line.
-        self._points_line_active = False
         self.instructor_console.appendPlainText(text.rstrip())
         sb = self.instructor_console.verticalScrollBar()
         sb.setValue(sb.maximum())
 
-    def _log_points_tick(self):
-        """Render points_update as a single self-overwriting spinner line."""
-        spinner = "|/-\\"[self._points_spinner_idx % 4]
-        self._points_spinner_idx += 1
-        text = f"[INSTR-WS] Received: points_update  {spinner}"
-        cursor = self.instructor_console.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        if self._points_line_active:
-            # Replace the contents of the current (last) block in place.
-            cursor.movePosition(
-                QTextCursor.MoveOperation.StartOfBlock,
-                QTextCursor.MoveMode.KeepAnchor,
-            )
-            cursor.removeSelectedText()
-            cursor.insertText(text)
-            # Keep the view pinned to the bottom without jitter.
-            sb = self.instructor_console.verticalScrollBar()
-            sb.setValue(sb.maximum())
-        else:
-            self.instructor_console.appendPlainText(text)
-            self._points_line_active = True
 
     # ── Server console (process is owned by MainWindow) ───────────────────────────
 
