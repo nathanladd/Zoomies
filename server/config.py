@@ -21,6 +21,12 @@ if IS_FROZEN:
             _legacy_user_dir.rename(USER_DATA_DIR)
         except OSError:
             pass
+elif sys.platform != "win32":
+    # Linux / macOS server deployment: honour RUDI_DATA_DIR env var or
+    # default to ~/.local/share/rudi for user-writable data.
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    _env_data = os.environ.get("RUDI_DATA_DIR")
+    USER_DATA_DIR = Path(_env_data) if _env_data else Path.home() / ".local" / "share" / "rudi"
 else:
     BASE_DIR = Path(__file__).resolve().parent.parent
     USER_DATA_DIR = BASE_DIR

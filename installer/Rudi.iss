@@ -55,7 +55,6 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "firewall";    Description: "Allow {#AppDisplayName} through the Windows firewall (port 5000)"; GroupDescription: "Networking:"; Flags: unchecked
 
 [Files]
 ; Entire PyInstaller one-dir bundle (dist/Rudi/*) goes into {app}.
@@ -66,13 +65,9 @@ Name: "{autoprograms}\{#AppDisplayName}"; Filename: "{app}\{#AppExeName}"
 Name: "{autodesktop}\{#AppDisplayName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Run]
-; Best-effort firewall rule so the student LAN can reach the server.
-Filename: "netsh.exe"; Parameters: "advfirewall firewall add rule name=""{#AppDisplayName}"" dir=in action=allow protocol=TCP localport=5000"; Flags: runhidden; Tasks: firewall
 ; Offer to launch the app at the end of install.
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppDisplayName}}"; Flags: nowait postinstall skipifsilent
 
-[UninstallRun]
-Filename: "netsh.exe"; Parameters: "advfirewall firewall delete rule name=""{#AppDisplayName}"""; Flags: runhidden; RunOnceId: "RemoveFirewallRule"
 
 [UninstallDelete]
 ; %LOCALAPPDATA%\Rudi holds the DB, uploaded media, and backups. Leave

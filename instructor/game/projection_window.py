@@ -15,10 +15,11 @@ class ProjectionWindow(QWidget):
     Answer choices are NOT shown here — students see them on their own devices.
     """
 
-    def __init__(self, game_id: int | None = None, server_port: int = 5000):
+    def __init__(self, game_id: int | None = None, server_host: str = "localhost", server_port: int = 5000):
         super().__init__()
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.game_id = game_id
+        self.server_host = server_host
         self.server_port = server_port
         self.setWindowTitle(f"Rudi v{__version__} — Projection")
         self.setMinimumSize(1024, 700)
@@ -245,14 +246,7 @@ class ProjectionWindow(QWidget):
         self.lb_title.hide()
         self.leaderboard_widget.hide()
 
-        # Resolve local IP for join URL
-        import socket
-        try:
-            hostname = socket.gethostname()
-            local_ip = socket.gethostbyname(hostname)
-        except Exception:
-            local_ip = "localhost"
-        self._join_url = f"{local_ip}:{self.server_port}"
+        self._join_url = f"{self.server_host}:{self.server_port}"
 
         self.question_label.setTextFormat(Qt.TextFormat.RichText)
         self.question_label.setSizePolicy(
@@ -346,21 +340,25 @@ class ProjectionWindow(QWidget):
         self.question_label.setFont(QFont("Segoe UI", 30, QFont.Weight.Bold))
         self.question_label.setStyleSheet("color: #e2e8f0; padding: 24px;")
 
-        # Show image if provided
+        # Show image if provided (fetched from the remote server over HTTP)
         image_url = msg.get("image_url")
         if image_url:
             try:
-                import os
-                from server.config import BASE_DIR
-                img_path = str(BASE_DIR / image_url.lstrip("/"))
-                pixmap = QPixmap(img_path)
-                if not pixmap.isNull():
-                    scaled = pixmap.scaledToHeight(
-                        min(350, pixmap.height()),
-                        Qt.TransformationMode.SmoothTransformation,
-                    )
-                    self.image_label.setPixmap(scaled)
-                    self.image_label.show()
+                import httpx
+                url = f"http://{self.server_host}:{self.server_port}/{image_url.lstrip('/')}"
+                resp = httpx.get(url, timeout=5.0)
+                if resp.status_code == 200:
+                    pixmap = QPixmap()
+                    pixmap.loadFromData(resp.content)
+                    if not pixmap.isNull():
+                        scaled = pixmap.scaledToHeight(
+                            min(350, pixmap.height()),
+                            Qt.TransformationMode.SmoothTransformation,
+                        )
+                        self.image_label.setPixmap(scaled)
+                        self.image_label.show()
+                    else:
+                        self.image_label.hide()
                 else:
                     self.image_label.hide()
             except Exception:

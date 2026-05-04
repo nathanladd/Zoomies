@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QPixmap
 
-from instructor.api_client import ApiClient, BASE_URL
+from instructor.api_client import ApiClient
 
 import httpx
 
@@ -26,8 +26,9 @@ class ImageDropZone(QFrame):
 
     THUMB_MAX = 160
 
-    def __init__(self, parent=None):
+    def __init__(self, base_url: str = "http://localhost:5000", parent=None):
         super().__init__(parent)
+        self._base_url = base_url
         self.setAcceptDrops(True)
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setMinimumHeight(70)
@@ -86,7 +87,7 @@ class ImageDropZone(QFrame):
 
     def _load_remote_preview(self, filename: str):
         try:
-            r = httpx.get(f"{BASE_URL}/media/questions/{filename}", timeout=5.0)
+            r = httpx.get(f"{self._base_url}/media/questions/{filename}", timeout=5.0)
             if r.status_code == 200:
                 pix = QPixmap()
                 pix.loadFromData(r.content)
@@ -183,7 +184,7 @@ class QuestionDialog(QDialog):
         layout.addRow("Text:", self.text_input)
 
         # Image (drag-and-drop) — sits between question text and answers
-        self.image_zone = ImageDropZone()
+        self.image_zone = ImageDropZone(base_url=self.api.base_url)
         self._pending_image_path: str | None = None
         self._remove_image: bool = False
         self._existing_image: str | None = None

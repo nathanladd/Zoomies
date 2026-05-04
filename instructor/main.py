@@ -1,27 +1,21 @@
-import subprocess
 import sys
 import time
-from datetime import datetime
-from pathlib import Path
 
 import httpx
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QDockWidget, QWidget, QVBoxLayout,
-    QStatusBar, QMessageBox, QFileDialog,
+    QApplication, QMainWindow, QDockWidget, QWidget,
+    QStatusBar, QMessageBox,
 )
-from PyQt6.QtCore import Qt, QProcess
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 
 from instructor.api_client import ApiClient
+from instructor.connection_settings import load as load_connection
 from instructor.core.question_pool import QuestionPool
 from instructor.core.quiz_builder import QuizBuilder
-from instructor.game.control_panel import GameControlPanel, kill_port_processes
+from instructor.game.control_panel import GameControlPanel
 from instructor.ui.scoring_window import SettingsWindow
 from version import __version__
-
-SERVER_HOST = "127.0.0.1"
-SERVER_PORT = 5000
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Name must match AppMutex in installer/Rudi.iss so Inno Setup can detect
 # a running instance during install/uninstall and offer to close it.
@@ -53,8 +47,8 @@ def _acquire_singleton_mutex() -> None:
         _SINGLETON_MUTEX_HANDLE = None
 
 
-def _wait_for_server(host: str, port: int, timeout_s: float = 15.0) -> bool:
-    """Poll the server's /api/topics endpoint until it responds 2xx or we time out."""
+def _check_server_reachable(host: str, port: int, timeout_s: float = 5.0) -> bool:
+    """Quick check that the remote server is responding."""
     deadline = time.monotonic() + timeout_s
     url = f"http://{host}:{port}/api/topics"
     while time.monotonic() < deadline:
@@ -74,56 +68,27 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"Rudi v{__version__}")
         self.setMinimumSize(1000, 700)
 
-        # Start the backend server BEFORE building tabs (they hit the API on init).
-        self.server_process: QProcess | None = None
-        self._start_server()
-        if not _wait_for_server(SERVER_HOST, SERVER_PORT, timeout_s=15.0):
-            QMessageBox.critical(
-                self, "Server did not start",
-                f"The Rudi server did not come online on port {SERVER_PORT} within 15 seconds.\n\n"
-                "Check the Server Console on the Game tab for errors, then restart the instructor app.",
-            )
+        # Load connection settings and create the API client.
+        conn = load_connection()
+        self.server_host: str = conn["server_host"]
+        self.server_port: int = conn["server_port"]
+        base_url = f"http://{self.server_host}:{self.server_port}"
+        self.api = ApiClient(base_url=base_url)
 
-        self.api = ApiClient()
+        if not _check_server_reachable(self.server_host, self.server_port):
+            QMessageBox.warning(
+                self, "Server unreachable",
+                f"Cannot reach the Rudi server at {base_url}.\n\n"
+                "Check that the server is running and the Connection settings are correct.",
+            )
 
         self._build_ui()
         self._build_menu()
-        self.statusBar().showMessage(f"Connected to server at {SERVER_HOST}:{SERVER_PORT}")
+        self.statusBar().showMessage(f"Connected to server at {base_url}")
         # Apply the canonical three-thirds right-side layout once the window
         # has a real size (resizeDocks needs that to split evenly).
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self._apply_default_view)
-
-    # ── Server lifecycle ──────────────────────────────────────────────────
-
-    def _start_server(self):
-        kill_port_processes(SERVER_PORT)  # clean up zombies from any previous run
-        self.server_process = QProcess(self)
-        self.server_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
-        if getattr(sys, "frozen", False):
-            # In a frozen build the installer ships a sibling Rudi-Server.exe
-            # (console subsystem) next to Rudi.exe — see the PyInstaller spec.
-            install_dir = Path(sys.executable).parent
-            server_exe = install_dir / "Rudi-Server.exe"
-            self.server_process.setWorkingDirectory(str(install_dir))
-            self.server_process.start(str(server_exe), [])
-        else:
-            self.server_process.setWorkingDirectory(str(PROJECT_ROOT))
-            self.server_process.start(sys.executable, ["run_server.py"])
-        self.server_process.waitForStarted(3000)
-
-    def _stop_server(self):
-        if not self.server_process:
-            return
-        if self.server_process.state() != QProcess.ProcessState.NotRunning:
-            pid = self.server_process.processId()
-            if pid:
-                subprocess.run(
-                    ["taskkill", "/F", "/T", "/PID", str(pid)],
-                    capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
-                )
-            self.server_process.waitForFinished(2000)
-        kill_port_processes(SERVER_PORT)
 
     def _build_ui(self):
         # Tabs for content management
@@ -135,8 +100,11 @@ class MainWindow(QMainWindow):
             self.question_pool.topics_requested.connect(self._open_topics_settings)
 
         # Game panel is the main window's central widget
-        self.game_panel = GameControlPanel(self.api, server_process=self.server_process)
-        self.game_panel.restart_server_requested.connect(self._restart_server)
+        self.game_panel = GameControlPanel(
+            self.api,
+            server_host=self.server_host,
+            server_port=self.server_port,
+        )
         self.setCentralWidget(self.game_panel)
 
         # Dock widgets for authoring tools
@@ -291,63 +259,6 @@ class MainWindow(QMainWindow):
         )
         view_menu.addAction(self.projection_action)
 
-        # Database menu
-        db_menu = menubar.addMenu("&Database")
-
-        backup_action = QAction("&Backup Database\u2026", self)
-        backup_action.triggered.connect(self._backup_database)
-        db_menu.addAction(backup_action)
-
-        restore_action = QAction("&Restore Database\u2026", self)
-        restore_action.triggered.connect(self._restore_database)
-        db_menu.addAction(restore_action)
-
-    def _backup_database(self):
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        default = str(Path.home() / f"rudi-{stamp}.zip")
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Save Backup As", default, "Zip archives (*.zip)",
-        )
-        if not path:
-            return
-        try:
-            result = self.api.backup_database(path)
-        except Exception as e:
-            QMessageBox.warning(self, "Backup failed", str(e))
-            return
-        size_kb = result["size_bytes"] / 1024
-        QMessageBox.information(
-            self, "Backup complete",
-            f"Saved to:\n{result['path']}\n\n{size_kb:,.1f} KB",
-        )
-
-    def _restore_database(self):
-        confirm = QMessageBox.warning(
-            self, "Restore Database",
-            "This will replace the current database and question images with the contents of the backup.\n\n"
-            "Your current data will be moved to data/pre-restore-<timestamp>/.\n\n"
-            "The server must be restarted after restoring. Continue?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if confirm != QMessageBox.StandardButton.Yes:
-            return
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Select Backup Zip", str(Path.home()), "Zip archives (*.zip)",
-        )
-        if not path:
-            return
-        try:
-            result = self.api.restore_database(path)
-        except Exception as e:
-            QMessageBox.warning(self, "Restore failed", str(e))
-            return
-        QMessageBox.information(
-            self, "Restore complete",
-            f"Restored from:\n{result.get('restored_from', path)}\n\n"
-            f"Previous state: {result.get('previous_state', '?')}\n\n"
-            f"{result.get('notice', '')}",
-        )
 
     def _open_settings(self, initial_tab: int = SettingsWindow.TAB_TOPICS):
         dlg = SettingsWindow(self.api, self, initial_tab=initial_tab)
@@ -362,25 +273,6 @@ class MainWindow(QMainWindow):
     def _open_topics_settings(self):
         self._open_settings(SettingsWindow.TAB_TOPICS)
 
-    def _restart_server(self):
-        """Stop the current server QProcess, then start a fresh one and
-        re-wire the game panel's console to the new process. Triggered by
-        GameControlPanel's Restart Server button."""
-        self.statusBar().showMessage("Restarting server…")
-        self._stop_server()
-        self._start_server()
-        if not _wait_for_server(SERVER_HOST, SERVER_PORT, timeout_s=15.0):
-            QMessageBox.critical(
-                self, "Server did not restart",
-                f"The server did not come back online on port {SERVER_PORT} within 15 seconds.",
-            )
-            self.statusBar().showMessage("Server restart failed")
-            return
-        self.game_panel.set_server_process(self.server_process)
-        self.statusBar().showMessage(
-            f"Server restarted at {SERVER_HOST}:{SERVER_PORT}", 5000,
-        )
-
     def closeEvent(self, event):
         # ProjectionWindow is a parentless top-level window, so closing the
         # main window doesn't cascade to it. Close it explicitly.
@@ -388,7 +280,7 @@ class MainWindow(QMainWindow):
         if proj is not None:
             proj.close()
             self.game_panel.projection_window = None
-        # Tear down the WS thread the game panel owns before the server dies.
+        # Tear down the WS thread the game panel owns.
         if getattr(self.game_panel, "ws_thread", None) is not None:
             try:
                 self.game_panel.ws_thread.stop()
@@ -396,7 +288,6 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
         self.api.close()
-        self._stop_server()
         event.accept()
 
 

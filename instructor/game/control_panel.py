@@ -1,50 +1,16 @@
 import json
-import os
-import subprocess
 import sys
 import threading
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QMessageBox, QComboBox, QGroupBox, QTableWidget, QTableWidgetItem,
-    QHeaderView, QPlainTextEdit, QSplitter,
+    QHeaderView, QPlainTextEdit,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QProcess, QObject
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject
 
 from instructor.api_client import ApiClient
 from instructor.game.projection_window import ProjectionWindow
-
-
-def kill_port_processes(port: int = 5000):
-    """Kill any process currently listening on the given port (Windows)."""
-    try:
-        result = subprocess.run(
-            ["netstat", "-ano"],
-            capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-        pids = set()
-        for line in result.stdout.splitlines():
-            if f":{port}" in line and "LISTENING" in line:
-                parts = line.split()
-                if parts:
-                    try:
-                        pids.add(int(parts[-1]))
-                    except ValueError:
-                        pass
-        my_pid = os.getpid()
-        for pid in pids:
-            if pid == my_pid or pid == 0:
-                continue
-            try:
-                subprocess.run(
-                    ["taskkill", "/F", "/T", "/PID", str(pid)],
-                    capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
-                )
-                print(f"[SERVER] Killed stale process on port {port} (PID {pid})")
-            except Exception:
-                pass
-    except Exception:
-        pass
 
 
 class LogStream(QObject):
@@ -117,7 +83,10 @@ class WebSocketThread(QThread):
                         msg_type = data.get('type', '?')
                         # points_update is high-frequency; the GUI thread renders
                         # it as a single self-overwriting spinner line instead.
-                        if msg_type != 'points_update':
+                        if msg_type == 'player_answered':
+                            pname = data.get('name', '?')
+                            print(f"[INSTR-WS] Received: {pname} answered")
+                        elif msg_type != 'points_update':
                             print(f"[INSTR-WS] Received: {msg_type}")
                         self.message_received.emit(data)
                     except asyncio.TimeoutError:
@@ -146,17 +115,16 @@ class GameControlPanel(QWidget):
     # Emitted whenever the projection window's visibility changes so the
     # View menu checkmark can stay in sync.
     projection_visibility_changed = pyqtSignal(bool)
-    # Emitted when the user clicks "Restart Server" — MainWindow handles the
-    # actual stop/start since it owns the QProcess.
-    restart_server_requested = pyqtSignal()
     # Emitted from the background stats-fetch thread once the HTTP roundtrip
     # to /api/questions/{id}/stats finishes. Carries (question_id, stats_dict)
     # so the GUI slot can verify the result still matches the active question.
     _stats_loaded = pyqtSignal(int, dict)
 
-    def __init__(self, api: ApiClient, server_process: QProcess | None = None):
+    def __init__(self, api: ApiClient, server_host: str = "localhost", server_port: int = 5000):
         super().__init__()
         self.api = api
+        self.server_host = server_host
+        self.server_port = server_port
         self.ws_thread: WebSocketThread | None = None
         self.projection_window: ProjectionWindow | None = None
         self.current_game_id: int | None = None
@@ -164,15 +132,10 @@ class GameControlPanel(QWidget):
         # player_id -> bool (True correct, False wrong) for the current question.
         # Cleared on every new question_start and on game_end.
         self._answer_status: dict[int, bool] = {}
-        self._server_process = server_process  # owned by MainWindow
         self._build_ui()
         # Marshal background-thread stat results back onto the GUI thread.
         self._stats_loaded.connect(self._on_stats_loaded)
         self._setup_log_redirect()
-        if self._server_process is not None:
-            self._server_process.readyReadStandardOutput.connect(self._read_server_output)
-            self._server_process.finished.connect(self._on_server_finished)
-            self.server_console.appendPlainText("--- Server running ---")
         self._refresh_quizzes()
 
     def _build_ui(self):
@@ -302,21 +265,12 @@ class GameControlPanel(QWidget):
         srv_layout.setContentsMargins(0, 0, 0, 0)
         srv_toolbar = QHBoxLayout()
         srv_toolbar.setContentsMargins(0, 0, 0, 0)
-        self.restart_server_btn = QPushButton("Restart Server")
-        self.restart_server_btn.setToolTip(
-            "Kill and relaunch the backend server on port 5000. "
-            "Use this if API calls start returning errors mid-game."
-        )
-        self.restart_server_btn.clicked.connect(self._on_restart_server_clicked)
-        srv_toolbar.addWidget(self.restart_server_btn)
         srv_toolbar.addStretch()
         self.server_version_label = QLabel("Server: …")
         self.server_version_label.setStyleSheet("color: #94a3b8; padding: 0 6px;")
         self.server_version_label.setToolTip("Version reported by GET /api/version")
         srv_toolbar.addWidget(self.server_version_label)
         srv_layout.addLayout(srv_toolbar)
-        # Version label is refreshed only at startup and after a server
-        # restart (see set_server_process); no periodic polling.
         QTimer.singleShot(800, self._refresh_server_version)
         self.server_console = QPlainTextEdit()
         self.server_console.setReadOnly(True)
@@ -377,7 +331,8 @@ class GameControlPanel(QWidget):
         if self.projection_window is None:
             self.projection_window = ProjectionWindow(
                 game_id=self.current_game_id,
-                server_port=5000,
+                server_host=self.server_host,
+                server_port=self.server_port,
             )
         else:
             self.projection_window.reset_for_new_game(self.current_game_id)
@@ -434,7 +389,11 @@ class GameControlPanel(QWidget):
         if self.current_game_id is None:
             return
 
-        self.ws_thread = WebSocketThread(self.current_game_id)
+        self.ws_thread = WebSocketThread(
+            self.current_game_id,
+            host=self.server_host,
+            port=self.server_port,
+        )
         self.ws_thread.message_received.connect(self._on_ws_message)
         self.ws_thread.connected.connect(self._on_ws_connected)
         self.ws_thread.disconnected.connect(self._on_ws_disconnected)
@@ -589,7 +548,8 @@ class GameControlPanel(QWidget):
         if self.projection_window is None:
             self.projection_window = ProjectionWindow(
                 game_id=self.current_game_id,
-                server_port=5000,
+                server_host=self.server_host,
+                server_port=self.server_port,
             )
 
         if self.projection_window.isVisible():
@@ -786,52 +746,25 @@ class GameControlPanel(QWidget):
         sys.stdout = self._log_stream
 
     def _append_instructor_log(self, text: str):
-        self.instructor_console.appendPlainText(text.rstrip())
-        sb = self.instructor_console.verticalScrollBar()
-        sb.setValue(sb.maximum())
+        stripped = text.rstrip()
+        if stripped.startswith("[INSTR-WS]"):
+            self.server_console.appendPlainText(stripped)
+            sb = self.server_console.verticalScrollBar()
+            sb.setValue(sb.maximum())
+        else:
+            self.instructor_console.appendPlainText(stripped)
+            sb = self.instructor_console.verticalScrollBar()
+            sb.setValue(sb.maximum())
 
 
-    # ── Server console (process is owned by MainWindow) ───────────────────────────
-
-    def _read_server_output(self):
-        if self._server_process:
-            data = self._server_process.readAllStandardOutput()
-            text = bytes(data).decode("utf-8", errors="replace")
-            appended = False
-            for line in text.splitlines():
-                if line.strip():
-                    self.server_console.appendPlainText(line)
-                    appended = True
-            if appended:
-                sb = self.server_console.verticalScrollBar()
-                sb.setValue(sb.maximum())
-
-    def _on_server_finished(self, exit_code, exit_status):
-        self.server_console.appendPlainText(f"--- Server exited (code {exit_code}) ---")
-
-    def _on_restart_server_clicked(self):
-        confirm = QMessageBox.question(
-            self, "Restart Server",
-            "Kill and relaunch the backend server?\n\n"
-            "Any in-progress game state held only in server memory will be lost. "
-            "Player scores and questions in the database are not affected.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if confirm != QMessageBox.StandardButton.Yes:
-            return
-        self.server_console.appendPlainText("--- Restart requested by user ---")
-        self.restart_server_btn.setEnabled(False)
-        QTimer.singleShot(2000, lambda: self.restart_server_btn.setEnabled(True))
-        self.restart_server_requested.emit()
+    # ── Server version ─────────────────────────────────────────────────────────────
 
     def _refresh_server_version(self) -> None:
-        """Poll /api/version and update the label. Runs every few seconds and
-        immediately after a restart so the user can verify they're on the
-        intended build."""
+        """Poll /api/version and update the label."""
         try:
             import httpx
-            r = httpx.get("http://127.0.0.1:5000/api/version", timeout=1.0)
+            url = f"http://{self.server_host}:{self.server_port}/api/version"
+            r = httpx.get(url, timeout=1.0)
             if r.status_code == 200:
                 v = r.json().get("version", "?")
                 self.server_version_label.setText(f"Server: v{v}")
@@ -841,19 +774,6 @@ class GameControlPanel(QWidget):
             pass
         self.server_version_label.setText("Server: offline")
         self.server_version_label.setStyleSheet("color: #f87171; padding: 0 6px;")
-
-    def set_server_process(self, proc: QProcess | None) -> None:
-        """Swap in a new server QProcess after MainWindow restarts it.
-
-        Re-wires log piping and the exit-notification slot so the console
-        keeps working across restarts.
-        """
-        self._server_process = proc
-        if proc is not None:
-            proc.readyReadStandardOutput.connect(self._read_server_output)
-            proc.finished.connect(self._on_server_finished)
-            self.server_console.appendPlainText("--- Server running ---")
-        QTimer.singleShot(800, self._refresh_server_version)
 
     def closeEvent(self, event):
         # Restore stdout

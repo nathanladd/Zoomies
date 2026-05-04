@@ -14,10 +14,11 @@ import math
 from PyQt6.QtCore import Qt, QPointF, QRectF
 from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPainterPath, QPen, QPolygonF
 from PyQt6.QtWidgets import (
-    QDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QTabWidget,
-    QVBoxLayout, QWidget,
+    QDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
 )
 
+from instructor.connection_settings import load as load_connection, save as save_connection
 from instructor.core.topic_manager import TopicManager
 
 
@@ -396,11 +397,58 @@ class ScoringPanel(QWidget):
         )
 
 
+class ConnectionPanel(QWidget):
+    """Panel for configuring the remote server host and port."""
+
+    def __init__(self, api, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.api = api
+        settings = load_connection()
+
+        form = QFormLayout()
+        self.host_edit = QLineEdit(settings["server_host"])
+        self.host_edit.setPlaceholderText("e.g. 192.168.1.50 or rudi.local")
+        self.port_spin = QSpinBox()
+        self.port_spin.setRange(1, 65535)
+        self.port_spin.setValue(settings["server_port"])
+        form.addRow("Server Host:", self.host_edit)
+        form.addRow("Server Port:", self.port_spin)
+
+        self.save_btn = QPushButton("Save && Reconnect")
+        self.save_btn.clicked.connect(self._save)
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet("color: #94a3b8; font-size: 12px;")
+
+        layout = QVBoxLayout(self)
+        layout.addLayout(form)
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(self.save_btn)
+        btn_row.addWidget(self.status_label)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+        layout.addStretch()
+
+    def _save(self):
+        host = self.host_edit.text().strip()
+        port = self.port_spin.value()
+        if not host:
+            QMessageBox.warning(self, "Validation", "Server host cannot be empty.")
+            return
+        save_connection(host, port)
+        # Update the live ApiClient base URL
+        new_url = f"http://{host}:{port}"
+        self.api.base_url = new_url
+        self.api.client = self.api._make_client(new_url)
+        self.status_label.setText(f"Saved. Now connecting to {new_url}")
+        self.status_label.setStyleSheet("color: #34d399; font-size: 12px;")
+
+
 class SettingsWindow(QDialog):
-    """Tabbed settings dialog: Topics + Scoring."""
+    """Tabbed settings dialog: Topics + Scoring + Connection."""
 
     TAB_TOPICS = 0
     TAB_SCORING = 1
+    TAB_CONNECTION = 2
 
     def __init__(self, api, parent: QWidget | None = None, initial_tab: int = 0):
         super().__init__(parent)
@@ -411,8 +459,10 @@ class SettingsWindow(QDialog):
         self.tabs = QTabWidget(self)
         self.topic_manager = TopicManager(api)
         self.scoring_panel = ScoringPanel(api)
+        self.connection_panel = ConnectionPanel(api)
         self.tabs.addTab(self.topic_manager, "Topics")
         self.tabs.addTab(self.scoring_panel, "Scoring")
+        self.tabs.addTab(self.connection_panel, "Connection")
         self.tabs.setCurrentIndex(initial_tab)
 
         close_btn = QPushButton("Close")

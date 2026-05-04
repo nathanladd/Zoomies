@@ -1,8 +1,6 @@
 import httpx
 from typing import Any
 
-BASE_URL = "http://localhost:5000"
-
 
 def _raise_for_status(resp: httpx.Response) -> None:
     """Raise a RuntimeError with the server's detail message on HTTP error."""
@@ -21,8 +19,13 @@ def _raise_for_status(resp: httpx.Response) -> None:
 class ApiClient:
     """Synchronous HTTP client for the instructor app to communicate with the server."""
 
-    def __init__(self, base_url: str = BASE_URL):
-        self.client = httpx.Client(base_url=base_url, timeout=10.0)
+    def __init__(self, base_url: str = "http://localhost:5000"):
+        self.base_url = base_url
+        self.client = self._make_client(base_url)
+
+    @staticmethod
+    def _make_client(base_url: str) -> httpx.Client:
+        return httpx.Client(base_url=base_url, timeout=10.0)
 
     def close(self):
         self.client.close()
@@ -153,19 +156,6 @@ class ApiClient:
 
     def delete_game(self, game_id: int) -> None:
         self.client.delete(f"/api/games/{game_id}")
-
-    # ── Admin (backup / restore) ────────────────────────────────────────────────────
-
-    def backup_database(self, path: str | None = None) -> dict[str, Any]:
-        params = {"path": path} if path else {}
-        resp = self.client.post("/api/admin/backup", params=params, timeout=60.0)
-        resp.raise_for_status()
-        return resp.json()
-
-    def restore_database(self, path: str) -> dict[str, Any]:
-        resp = self.client.post("/api/admin/restore", json={"path": path}, timeout=60.0)
-        resp.raise_for_status()
-        return resp.json()
 
     # ── Settings (scoring curve) ───────────────────────────────────────────
 

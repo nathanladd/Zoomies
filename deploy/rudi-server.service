@@ -1,0 +1,16 @@
+[Unit]
+Description=Rudi Game Server
+After=network.target
+
+[Service]
+Type=simple
+User=rudi
+Group=rudi
+WorkingDirectory=/opt/rudi
+ExecStart=/opt/rudi/venv/bin/python run_server.py
+Restart=on-failure
+RestartSec=5
+Environment=RUDI_DATA_DIR=/opt/rudi/data
+
+[Install]
+WantedBy=multi-user.target
