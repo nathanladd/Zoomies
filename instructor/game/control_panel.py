@@ -1,5 +1,4 @@
 import json
-import sys
 import threading
 
 from PyQt6.QtWidgets import (
@@ -7,29 +6,11 @@ from PyQt6.QtWidgets import (
     QMessageBox, QComboBox, QGroupBox, QTableWidget, QTableWidgetItem,
     QHeaderView, QPlainTextEdit,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread
 
 from instructor.api_client import ApiClient
 from instructor.game.projection_window import ProjectionWindow
 
-
-class LogStream(QObject):
-    """Redirect writes to a Qt signal so they appear in a QPlainTextEdit."""
-    text_written = pyqtSignal(str)
-
-    def __init__(self, original_stream=None):
-        super().__init__()
-        self._original = original_stream
-
-    def write(self, text: str):
-        if text.strip():
-            self.text_written.emit(text)
-        if self._original:
-            self._original.write(text)
-
-    def flush(self):
-        if self._original:
-            self._original.flush()
 
 try:
     import websockets
@@ -37,6 +18,46 @@ try:
     HAS_WEBSOCKETS = True
 except ImportError:
     HAS_WEBSOCKETS = False
+
+
+class LogWebSocketThread(QThread):
+    """Background thread that connects to the server's /ws/logs endpoint
+    and emits each log line as a signal for the server console."""
+    line_received = pyqtSignal(str)
+
+    def __init__(self, host: str, port: int):
+        super().__init__()
+        self.host = host
+        self.port = port
+        self._running = False
+
+    def run(self):
+        if not HAS_WEBSOCKETS:
+            return
+        self._running = True
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self._listen())
+        loop.close()
+
+    async def _listen(self):
+        url = f"ws://{self.host}:{self.port}/ws/logs"
+        while self._running:
+            try:
+                async with websockets.connect(url) as ws:
+                    while self._running:
+                        try:
+                            line = await asyncio.wait_for(ws.recv(), timeout=0.5)
+                            self.line_received.emit(line)
+                        except asyncio.TimeoutError:
+                            continue
+            except Exception:
+                if not self._running:
+                    break
+                await asyncio.sleep(2)  # retry after delay
+
+    def stop(self):
+        self._running = False
 
 
 class WebSocketThread(QThread):
@@ -132,10 +153,11 @@ class GameControlPanel(QWidget):
         # player_id -> bool (True correct, False wrong) for the current question.
         # Cleared on every new question_start and on game_end.
         self._answer_status: dict[int, bool] = {}
+        self._log_ws: LogWebSocketThread | None = None
         self._build_ui()
         # Marshal background-thread stat results back onto the GUI thread.
         self._stats_loaded.connect(self._on_stats_loaded)
-        self._setup_log_redirect()
+        self._connect_log_ws()
         self._refresh_quizzes()
 
     def _build_ui(self):
@@ -280,18 +302,6 @@ class GameControlPanel(QWidget):
             "background-color: #1a1a2e; color: #a5b4fc;"
         )
         srv_layout.addWidget(self.server_console)
-
-        self.instructor_console_group = QWidget()
-        instr_layout = QVBoxLayout(self.instructor_console_group)
-        instr_layout.setContentsMargins(0, 0, 0, 0)
-        self.instructor_console = QPlainTextEdit()
-        self.instructor_console.setReadOnly(True)
-        self.instructor_console.setMaximumBlockCount(500)
-        self.instructor_console.setStyleSheet(
-            "font-family: Consolas, monospace; font-size: 11px; "
-            "background-color: #1a1a2e; color: #6ee7b7;"
-        )
-        instr_layout.addWidget(self.instructor_console)
 
         layout.addStretch(1)
 
@@ -738,23 +748,17 @@ class GameControlPanel(QWidget):
         item.setFont(font)
         self.lb_table.setItem(row, 2, item)
 
-    # ── Log redirect ──────────────────────────────────────────────────────
+    # ── Server log stream ─────────────────────────────────────────────────
 
-    def _setup_log_redirect(self):
-        self._log_stream = LogStream(sys.stdout)
-        self._log_stream.text_written.connect(self._append_instructor_log)
-        sys.stdout = self._log_stream
+    def _connect_log_ws(self):
+        self._log_ws = LogWebSocketThread(self.server_host, self.server_port)
+        self._log_ws.line_received.connect(self._append_server_log)
+        self._log_ws.start()
 
-    def _append_instructor_log(self, text: str):
-        stripped = text.rstrip()
-        if stripped.startswith("[INSTR-WS]"):
-            self.server_console.appendPlainText(stripped)
-            sb = self.server_console.verticalScrollBar()
-            sb.setValue(sb.maximum())
-        else:
-            self.instructor_console.appendPlainText(stripped)
-            sb = self.instructor_console.verticalScrollBar()
-            sb.setValue(sb.maximum())
+    def _append_server_log(self, line: str):
+        self.server_console.appendPlainText(line)
+        sb = self.server_console.verticalScrollBar()
+        sb.setValue(sb.maximum())
 
 
     # ── Server version ─────────────────────────────────────────────────────────────
@@ -776,9 +780,9 @@ class GameControlPanel(QWidget):
         self.server_version_label.setStyleSheet("color: #f87171; padding: 0 6px;")
 
     def closeEvent(self, event):
-        # Restore stdout
-        if hasattr(self, '_log_stream') and self._log_stream._original:
-            sys.stdout = self._log_stream._original
+        if self._log_ws:
+            self._log_ws.stop()
+            self._log_ws.wait(2000)
         if self.ws_thread:
             self.ws_thread.stop()
             self.ws_thread.wait(2000)

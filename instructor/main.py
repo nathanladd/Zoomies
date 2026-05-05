@@ -122,31 +122,19 @@ class MainWindow(QMainWindow):
         for dock in (self.dock_questions, self.dock_quizzes):
             dock.hide()
 
-        # Right-side dockable runtime panels: Leaderboard, Server Console,
-        # Instructor Console. Built inside GameControlPanel; MainWindow owns
-        # the QDockWidget wrappers so they can be toggled/moved/floated.
+        # Right-side dockable runtime panels: Leaderboard and Server Console.
+        # Built inside GameControlPanel; MainWindow owns the QDockWidget
+        # wrappers so they can be toggled/moved/floated.
         self.dock_leaderboard = self._make_dock(
             "Live Leaderboard", self.game_panel.leaderboard_group,
         )
         self.dock_server_console = self._make_dock(
             "Server Console", self.game_panel.server_console_group,
         )
-        self.dock_instructor_console = self._make_dock(
-            "Instructor Console", self.game_panel.instructor_console_group,
-        )
-        for dock in (
-            self.dock_leaderboard,
-            self.dock_server_console,
-            self.dock_instructor_console,
-        ):
+        for dock in (self.dock_leaderboard, self.dock_server_console):
             self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
-        # Stack them vertically in thirds instead of tabifying.
         self.splitDockWidget(
             self.dock_leaderboard, self.dock_server_console,
-            Qt.Orientation.Vertical,
-        )
-        self.splitDockWidget(
-            self.dock_server_console, self.dock_instructor_console,
             Qt.Orientation.Vertical,
         )
 
@@ -158,11 +146,7 @@ class MainWindow(QMainWindow):
         visible and sized in equal thirds."""
         for dock in (self.dock_questions, self.dock_quizzes):
             dock.hide()
-        right_docks = (
-            self.dock_leaderboard,
-            self.dock_server_console,
-            self.dock_instructor_console,
-        )
+        right_docks = (self.dock_leaderboard, self.dock_server_console)
         for dock in right_docks:
             # Un-float and re-dock if the user had torn it out.
             if dock.isFloating():
@@ -175,14 +159,10 @@ class MainWindow(QMainWindow):
             self.dock_leaderboard, self.dock_server_console,
             Qt.Orientation.Vertical,
         )
-        self.splitDockWidget(
-            self.dock_server_console, self.dock_instructor_console,
-            Qt.Orientation.Vertical,
-        )
-        # Size the three right-side docks in equal thirds of the window height.
-        third = max(100, self.height() // 3)
+        # Size the two right-side docks in equal halves of the window height.
+        half = max(100, self.height() // 2)
         self.resizeDocks(
-            list(right_docks), [third, third, third], Qt.Orientation.Vertical,
+            list(right_docks), [half, half], Qt.Orientation.Vertical,
         )
 
     def _make_dock(self, title: str, widget: QWidget) -> QDockWidget:
@@ -228,11 +208,7 @@ class MainWindow(QMainWindow):
             view_menu.addAction(action)
 
         view_menu.addSeparator()
-        for dock in (
-            self.dock_leaderboard,
-            self.dock_server_console,
-            self.dock_instructor_console,
-        ):
+        for dock in (self.dock_leaderboard, self.dock_server_console):
             view_menu.addAction(dock.toggleViewAction())
 
         view_menu.addSeparator()

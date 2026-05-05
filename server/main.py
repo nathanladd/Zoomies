@@ -11,6 +11,7 @@ from server.routers import topics, questions, quizzes, games, admin, settings
 from server.game.handlers import (
     load_engine, handle_student_ws, handle_instructor_ws,
 )
+from server.log_broadcast import broadcaster
 from version import __version__
 
 # Config ensures user-writable data/media/backup dirs exist.
@@ -23,6 +24,7 @@ if not getattr(__import__("sys"), "frozen", False):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    broadcaster.install()
     await init_db()
     yield
 
@@ -89,3 +91,16 @@ async def ws_student(websocket: WebSocket, game_id: int):
 @app.websocket("/ws/instructor/{game_id}")
 async def ws_instructor(websocket: WebSocket, game_id: int):
     await handle_instructor_ws(websocket, game_id)
+
+
+@app.websocket("/ws/logs")
+async def ws_logs(websocket: WebSocket):
+    """Stream server log output to the instructor app."""
+    await broadcaster.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()  # keep-alive; client won't send much
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await broadcaster.disconnect(websocket)
