@@ -25,10 +25,11 @@ class LogWebSocketThread(QThread):
     and emits each log line as a signal for the server console."""
     line_received = pyqtSignal(str)
 
-    def __init__(self, host: str, port: int):
+    def __init__(self, host: str, port: int, token: str | None = None):
         super().__init__()
         self.host = host
         self.port = port
+        self.token = token
         self._running = False
 
     def run(self):
@@ -41,7 +42,8 @@ class LogWebSocketThread(QThread):
         loop.close()
 
     async def _listen(self):
-        url = f"ws://{self.host}:{self.port}/ws/logs"
+        suffix = f"?token={self.token}" if self.token else ""
+        url = f"ws://{self.host}:{self.port}/ws/logs{suffix}"
         while self._running:
             try:
                 async with websockets.connect(url) as ws:
@@ -66,11 +68,12 @@ class WebSocketThread(QThread):
     connected = pyqtSignal()
     disconnected = pyqtSignal()
 
-    def __init__(self, game_id: int, host: str = "localhost", port: int = 5000):
+    def __init__(self, game_id: int, host: str = "localhost", port: int = 5000, token: str | None = None):
         super().__init__()
         self.game_id = game_id
         self.host = host
         self.port = port
+        self.token = token
         self._running = False
         self._ws = None
         self._loop = None
@@ -82,7 +85,8 @@ class WebSocketThread(QThread):
         self._loop.run_until_complete(self._connect())
 
     async def _connect(self):
-        uri = f"ws://{self.host}:{self.port}/ws/instructor/{self.game_id}"
+        suffix = f"?token={self.token}" if self.token else ""
+        uri = f"ws://{self.host}:{self.port}/ws/instructor/{self.game_id}{suffix}"
         print(f"[INSTR-WS] Connecting to {uri}")
         try:
             async with websockets.connect(uri) as ws:
@@ -149,6 +153,7 @@ class GameControlPanel(QWidget):
         self.ws_thread: WebSocketThread | None = None
         self.projection_window: ProjectionWindow | None = None
         self.current_game_id: int | None = None
+        self.current_join_code: str | None = None
         self._players: dict[int, str] = {}  # player_id -> name
         # player_id -> bool (True correct, False wrong) for the current question.
         # Cleared on every new question_start and on game_end.
@@ -328,24 +333,27 @@ class GameControlPanel(QWidget):
         try:
             game = self.api.create_game(quiz_id)
             self.current_game_id = game["id"]
+            self.current_join_code = game.get("join_code")
             self.api.init_game(self.current_game_id)
-            self.game_label.setText(f"Game #{self.current_game_id} (waiting)")
+            code_display = self.current_join_code or str(self.current_game_id)
+            self.game_label.setText(f"Game #{self.current_game_id} — Code: {code_display} (waiting)")
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to create game: {e}")
             return
 
-        # Make sure the projector is showing the new game number. The window
+        # Make sure the projector is showing the new game code. The window
         # is a persistent singleton — we reuse it (keeping fullscreen /
         # position) if it exists, lazily create it otherwise, and always
         # ensure it's visible at the start of a new game.
         if self.projection_window is None:
             self.projection_window = ProjectionWindow(
                 game_id=self.current_game_id,
+                join_code=self.current_join_code,
                 server_host=self.server_host,
                 server_port=self.server_port,
             )
         else:
-            self.projection_window.reset_for_new_game(self.current_game_id)
+            self.projection_window.reset_for_new_game(self.current_game_id, self.current_join_code)
         self.projection_window.show()
         self.projection_visibility_changed.emit(True)
 
@@ -403,6 +411,7 @@ class GameControlPanel(QWidget):
             self.current_game_id,
             host=self.server_host,
             port=self.server_port,
+            token=getattr(self.api, "token", None),
         )
         self.ws_thread.message_received.connect(self._on_ws_message)
         self.ws_thread.connected.connect(self._on_ws_connected)
@@ -465,7 +474,8 @@ class GameControlPanel(QWidget):
         elif msg_type == "game_start":
             self.status_label.setText("Status: Game started!")
             if self.current_game_id is not None:
-                self.game_label.setText(f"Game #{self.current_game_id} (running)")
+                code_display = self.current_join_code or str(self.current_game_id)
+                self.game_label.setText(f"Game #{self.current_game_id} — Code: {code_display} (running)")
             self.btn_start.setEnabled(False)
             self.btn_next.setEnabled(True)
 
@@ -751,7 +761,10 @@ class GameControlPanel(QWidget):
     # ── Server log stream ─────────────────────────────────────────────────
 
     def _connect_log_ws(self):
-        self._log_ws = LogWebSocketThread(self.server_host, self.server_port)
+        self._log_ws = LogWebSocketThread(
+            self.server_host, self.server_port,
+            token=getattr(self.api, "token", None),
+        )
         self._log_ws.line_received.connect(self._append_server_log)
         self._log_ws.start()
 

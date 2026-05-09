@@ -15,10 +15,11 @@ class ProjectionWindow(QWidget):
     Answer choices are NOT shown here — students see them on their own devices.
     """
 
-    def __init__(self, game_id: int | None = None, server_host: str = "localhost", server_port: int = 5000):
+    def __init__(self, game_id: int | None = None, join_code: str | None = None, server_host: str = "localhost", server_port: int = 5000):
         super().__init__()
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.game_id = game_id
+        self.join_code = join_code
         self.server_host = server_host
         self.server_port = server_port
         self.setWindowTitle(f"Rudi v{__version__} — Projection")
@@ -255,7 +256,7 @@ class ProjectionWindow(QWidget):
         self._update_waiting_display()
 
     def _update_waiting_display(self):
-        game_text = f"Game Number:&nbsp;&nbsp;<b>{self.game_id}</b>" if self.game_id else ""
+        game_text = f"Game Code:&nbsp;&nbsp;<b>{self.join_code}</b>" if self.join_code else ""
         if self._player_count > 0:
             players_text = f'{self._player_count} player{"s" if self._player_count != 1 else ""} joined'
         else:
@@ -288,15 +289,16 @@ class ProjectionWindow(QWidget):
             f'</div>'
         )
 
-    def reset_for_new_game(self, game_id: int | None) -> None:
+    def reset_for_new_game(self, game_id: int | None, join_code: str | None = None) -> None:
         """Refresh this projection window to advertise a new game.
 
         Called when the instructor starts a new game while this window is
         already open — we don't want to destroy/recreate the window (that
         loses fullscreen state and flashes a new window on the projector),
-        we just snap back to the waiting screen with the new game number.
+        we just snap back to the waiting screen with the new game code.
         """
         self.game_id = game_id
+        self.join_code = join_code
         self.question_label.setFont(QFont("Segoe UI", 30, QFont.Weight.Bold))
         self.question_label.setStyleSheet("color: #e2e8f0; padding: 24px;")
         self._show_waiting()

@@ -56,6 +56,27 @@ def _run_lightweight_migrations(sync_conn) -> None:
             "ALTER TABLE questions ADD COLUMN correct_index INTEGER NOT NULL DEFAULT 0"
         ))
 
+    if not _column_exists("games", "join_code"):
+        sync_conn.execute(text(
+            "ALTER TABLE games ADD COLUMN join_code TEXT"
+        ))
+        # Assign codes to any existing games that don't have one.
+        import secrets, string
+        _CHARS = string.ascii_uppercase + string.digits
+        rows = sync_conn.execute(text("SELECT id FROM games WHERE join_code IS NULL")).fetchall()
+        for (game_id,) in rows:
+            while True:
+                code = "".join(secrets.choice(_CHARS) for _ in range(6))
+                exists = sync_conn.execute(
+                    text("SELECT 1 FROM games WHERE join_code = :c"), {"c": code}
+                ).fetchone()
+                if not exists:
+                    break
+            sync_conn.execute(
+                text("UPDATE games SET join_code = :c WHERE id = :id"),
+                {"c": code, "id": game_id},
+            )
+
 
 async def get_db() -> AsyncSession:  # type: ignore[misc]
     async with async_session() as session:

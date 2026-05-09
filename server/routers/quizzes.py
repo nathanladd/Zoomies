@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from server.auth import require_auth
 from server.database import get_db
 from server.models import Quiz, QuizQuestion, Question
 from server.schemas import (
@@ -9,7 +10,7 @@ from server.schemas import (
     QuizQuestionAdd, QuizQuestionReorder, QuizQuestionRead, QuestionRead,
 )
 
-router = APIRouter(prefix="/api/quizzes", tags=["quizzes"])
+router = APIRouter(prefix="/api/quizzes", tags=["quizzes"], dependencies=[Depends(require_auth)])
 
 
 def _qq_to_read(qq: QuizQuestion) -> QuizQuestionRead:

@@ -14,6 +14,8 @@ from server.websocket.manager import manager
 
 # Active game engines: game_id -> GameEngine
 active_games: dict[int, GameEngine] = {}
+# Reverse mapping: join_code -> game_id (populated by load_engine)
+join_codes: dict[str, int] = {}
 
 
 # Sentinel answer_text used in question_answer_stats to record a player who
@@ -98,11 +100,21 @@ async def load_engine(game_id: int, db: AsyncSession) -> GameEngine:
         randomize_order=quiz.randomize_order,
     )
     active_games[game_id] = engine
+    if game.join_code:
+        join_codes[game.join_code] = game_id
     return engine
 
 
 def get_engine(game_id: int) -> GameEngine | None:
     return active_games.get(game_id)
+
+
+def _evict_game(game_id: int) -> None:
+    """Remove a finished game from both in-memory dicts."""
+    active_games.pop(game_id, None)
+    for code, gid in list(join_codes.items()):
+        if gid == game_id:
+            del join_codes[code]
 
 
 async def handle_student_ws(ws: WebSocket, game_id: int) -> None:
@@ -335,7 +347,7 @@ async def handle_instructor_ws(ws: WebSocket, game_id: int) -> None:
                         "type": "game_end",
                         **end_info,
                     })
-                    active_games.pop(game_id, None)
+                    _evict_game(game_id)
                     break
                 else:
                     student_count = manager.get_student_count(game_id)
@@ -373,7 +385,7 @@ async def handle_instructor_ws(ws: WebSocket, game_id: int) -> None:
                     "type": "game_end",
                     **end_info,
                 })
-                active_games.pop(game_id, None)
+                _evict_game(game_id)
                 break
 
             elif msg_type == "get_status":

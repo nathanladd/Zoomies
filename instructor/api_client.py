@@ -19,13 +19,35 @@ def _raise_for_status(resp: httpx.Response) -> None:
 class ApiClient:
     """Synchronous HTTP client for the instructor app to communicate with the server."""
 
-    def __init__(self, base_url: str = "http://localhost:5000"):
+    def __init__(self, base_url: str = "http://localhost:5000", token: str | None = None):
         self.base_url = base_url
-        self.client = self._make_client(base_url)
+        self.token: str | None = token
+        self.client = self._make_client(base_url, token)
 
     @staticmethod
-    def _make_client(base_url: str) -> httpx.Client:
-        return httpx.Client(base_url=base_url, timeout=10.0)
+    def _make_client(base_url: str, token: str | None = None) -> httpx.Client:
+        headers = {}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        return httpx.Client(base_url=base_url, timeout=10.0, headers=headers)
+
+    def set_token(self, token: str) -> None:
+        """Update the auth token and rebuild the underlying HTTP client."""
+        self.token = token
+        self.client.close()
+        self.client = self._make_client(self.base_url, token)
+
+    def login(self, username: str, password: str) -> str:
+        """Authenticate with the server. Returns the JWT token. Raises RuntimeError on failure."""
+        resp = httpx.post(
+            f"{self.base_url}/api/auth/login",
+            json={"username": username, "password": password},
+            timeout=10.0,
+        )
+        _raise_for_status(resp)
+        token = resp.json()["token"]
+        self.set_token(token)
+        return token
 
     def close(self):
         self.client.close()

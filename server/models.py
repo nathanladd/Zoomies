@@ -84,6 +84,7 @@ class Game(Base):
     __tablename__ = "games"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    join_code: Mapped[str | None] = mapped_column(String(8), nullable=True, unique=True, index=True)
     quiz_id: Mapped[int] = mapped_column(Integer, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="waiting")
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

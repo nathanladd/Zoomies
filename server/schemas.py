@@ -116,6 +116,7 @@ class GameCreate(BaseModel):
 
 class GameRead(BaseModel):
     id: int
+    join_code: str | None = None
     quiz_id: int
     status: str
     started_at: datetime | None

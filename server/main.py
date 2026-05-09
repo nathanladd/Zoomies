@@ -5,11 +5,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from server.auth import require_auth, verify_ws_token
 from server.config import BASE_DIR, MEDIA_DIR, USER_DATA_DIR
 from server.database import init_db, get_db
 from server.routers import topics, questions, quizzes, games, admin, settings
+from server.routers import auth as auth_router
 from server.game.handlers import (
     load_engine, handle_student_ws, handle_instructor_ws,
+    join_codes,
 )
 from server.log_broadcast import broadcaster
 from version import __version__
@@ -39,6 +42,7 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 app.mount("/media", StaticFiles(directory=str(USER_DATA_DIR / "media")), name="media")
 
 # Register API routers
+app.include_router(auth_router.router)
 app.include_router(topics.router)
 app.include_router(questions.router)
 app.include_router(quizzes.router)
@@ -74,7 +78,7 @@ async def play_game():
 
 # ── Engine bootstrap + WebSocket endpoints ──────────────────────────────────────────────
 
-@app.post("/api/games/{game_id}/init")
+@app.post("/api/games/{game_id}/init", dependencies=[Depends(require_auth)])
 async def init_game_engine(game_id: int, db: AsyncSession = Depends(get_db)):
     try:
         engine = await load_engine(game_id, db)
@@ -83,24 +87,37 @@ async def init_game_engine(game_id: int, db: AsyncSession = Depends(get_db)):
     return {"status": "ok", "game_id": game_id, "question_count": engine.question_count}
 
 
-@app.websocket("/ws/student/{game_id}")
-async def ws_student(websocket: WebSocket, game_id: int):
+@app.websocket("/ws/student/{join_code}")
+async def ws_student(websocket: WebSocket, join_code: str):
+    game_id = join_codes.get(join_code.upper())
+    if game_id is None:
+        await websocket.accept()
+        await websocket.close(code=4000, reason="Invalid game code")
+        return
     await handle_student_ws(websocket, game_id)
 
 
 @app.websocket("/ws/instructor/{game_id}")
-async def ws_instructor(websocket: WebSocket, game_id: int):
+async def ws_instructor(websocket: WebSocket, game_id: int, token: str | None = None):
+    if not verify_ws_token(token):
+        await websocket.accept()
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
     await handle_instructor_ws(websocket, game_id)
 
 
 @app.websocket("/ws/logs")
-async def ws_logs(websocket: WebSocket):
+async def ws_logs(websocket: WebSocket, token: str | None = None):
     """Stream server log output to the instructor app."""
+    if not verify_ws_token(token):
+        await websocket.accept()
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
     await broadcaster.connect(websocket)
     try:
         while True:
             await websocket.receive_text()  # keep-alive; client won't send much
-    except WebSocketDisconnect:
+    except Exception:
         pass
     finally:
         await broadcaster.disconnect(websocket)

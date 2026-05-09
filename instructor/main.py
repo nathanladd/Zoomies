@@ -4,13 +4,14 @@ import time
 import httpx
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QDockWidget, QWidget,
-    QStatusBar, QMessageBox,
+    QStatusBar, QMessageBox, QDialog, QVBoxLayout,
+    QFormLayout, QLineEdit, QDialogButtonBox, QLabel,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 
 from instructor.api_client import ApiClient
-from instructor.connection_settings import load as load_connection
+from instructor.connection_settings import load as load_connection, save as save_connection
 from instructor.core.question_pool import QuestionPool
 from instructor.core.quiz_builder import QuizBuilder
 from instructor.game.control_panel import GameControlPanel
@@ -62,6 +63,44 @@ def _check_server_reachable(host: str, port: int, timeout_s: float = 5.0) -> boo
     return False
 
 
+class LoginDialog(QDialog):
+    """Ask for username and password. Pre-fills from stored credentials."""
+
+    def __init__(self, username: str = "", password: str = "", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Rudi — Instructor Login")
+        self.setMinimumWidth(320)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Enter your instructor credentials:"))
+
+        form = QFormLayout()
+        self.username_edit = QLineEdit(username)
+        self.password_edit = QLineEdit(password)
+        self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        form.addRow("Username:", self.username_edit)
+        form.addRow("Password:", self.password_edit)
+        layout.addLayout(form)
+
+        self.error_label = QLabel("")
+        self.error_label.setStyleSheet("color: #f87171;")
+        self.error_label.setWordWrap(True)
+        layout.addWidget(self.error_label)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def credentials(self) -> tuple[str, str]:
+        return self.username_edit.text().strip(), self.password_edit.text()
+
+    def show_error(self, msg: str) -> None:
+        self.error_label.setText(msg)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -81,6 +120,8 @@ class MainWindow(QMainWindow):
                 f"Cannot reach the Rudi server at {base_url}.\n\n"
                 "Check that the server is running and the Connection settings are correct.",
             )
+        else:
+            self._do_login(conn)
 
         self._build_ui()
         self._build_menu()
@@ -89,6 +130,24 @@ class MainWindow(QMainWindow):
         # has a real size (resizeDocks needs that to split evenly).
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self._apply_default_view)
+
+    def _do_login(self, conn: dict) -> None:
+        """Attempt login with stored credentials; show dialog on failure."""
+        username = conn.get("username", "instructor")
+        password = conn.get("password", "rudi")
+        while True:
+            try:
+                self.api.login(username, password)
+                # Persist successful credentials
+                save_connection(self.server_host, self.server_port, username, password)
+                return
+            except Exception:
+                dlg = LoginDialog(username=username, password="", parent=self)
+                dlg.show_error("Login failed — check your username and password.")
+                if dlg.exec() != QDialog.DialogCode.Accepted:
+                    # User cancelled — proceed without auth (API calls will fail with 401)
+                    return
+                username, password = dlg.credentials()
 
     def _build_ui(self):
         # Tabs for content management

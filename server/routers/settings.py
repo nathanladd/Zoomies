@@ -1,13 +1,14 @@
 """Settings endpoints (scoring curve, etc.)."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from server.auth import require_auth
 from server.scoring_curve import load_curve, save_curve
 from server.elimination_marks import load_marks, save_marks
 
-router = APIRouter(prefix="/api/settings", tags=["settings"])
+router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depends(require_auth)])
 
 
 class CurvePoint(BaseModel):

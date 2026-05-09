@@ -1,4 +1,4 @@
-"""Persist and load the server connection settings (host + port) as JSON."""
+"""Persist and load server connection settings (host, port, credentials) as JSON."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ from pathlib import Path
 _DEFAULTS = {
     "server_host": "localhost",
     "server_port": 5000,
+    "username": "instructor",
+    "password": "rudi",
 }
 
 
@@ -33,14 +35,24 @@ def load() -> dict:
                 settings["server_host"] = data["server_host"]
             if isinstance(data.get("server_port"), int):
                 settings["server_port"] = data["server_port"]
+            if isinstance(data.get("username"), str):
+                settings["username"] = data["username"]
+            if isinstance(data.get("password"), str):
+                settings["password"] = data["password"]
         except Exception:
             pass
     return settings
 
 
-def save(server_host: str, server_port: int) -> None:
+def save(server_host: str, server_port: int, username: str | None = None, password: str | None = None) -> None:
     """Write settings to disk."""
     path = _settings_path()
+    existing = load()
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump({"server_host": server_host, "server_port": server_port}, f, indent=2)
+        json.dump({
+            "server_host": server_host,
+            "server_port": server_port,
+            "username": username if username is not None else existing.get("username", _DEFAULTS["username"]),
+            "password": password if password is not None else existing.get("password", _DEFAULTS["password"]),
+        }, f, indent=2)

@@ -5,12 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from server.auth import require_auth
 from server.config import MEDIA_DIR, ALLOWED_IMAGE_EXTENSIONS, MAX_IMAGE_SIZE
 from server.database import get_db
 from server.models import Question, QuestionAnswerStat
 from server.schemas import QuestionCreate, QuestionUpdate, QuestionRead
 
-router = APIRouter(prefix="/api/questions", tags=["questions"])
+router = APIRouter(prefix="/api/questions", tags=["questions"], dependencies=[Depends(require_auth)])
 
 
 def _question_to_read(q: Question) -> QuestionRead:

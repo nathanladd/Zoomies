@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from server.auth import require_auth
 from server.database import get_db
 from server.models import Topic, Question
 from server.schemas import TopicCreate, TopicUpdate, TopicRead
 
-router = APIRouter(prefix="/api/topics", tags=["topics"])
+router = APIRouter(prefix="/api/topics", tags=["topics"], dependencies=[Depends(require_auth)])
 
 
 @router.get("", response_model=list[TopicRead])

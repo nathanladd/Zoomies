@@ -13,15 +13,16 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from server.auth import require_auth
 from server.config import (
     BACKUPS_DIR, BASE_DIR, DATA_DIR, DB_FILENAME, DB_PATH, MEDIA_DIR,
     USER_DATA_DIR,
 )
 from server.schemas import BackupResult, RestoreRequest
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_auth)])
 
 
 def _online_sqlite_backup(src: Path, dst: Path) -> None:
