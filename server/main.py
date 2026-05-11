@@ -15,7 +15,7 @@ from server.game.handlers import (
     join_codes,
 )
 from server.log_broadcast import broadcaster
-from version import __version__
+from version import SERVER_VERSION
 
 # Config ensures user-writable data/media/backup dirs exist.
 # Static assets live in BASE_DIR (bundled read-only in frozen mode), so only
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Rudi", version=__version__, lifespan=lifespan)
+app = FastAPI(title="Rudi", version=SERVER_VERSION, lifespan=lifespan)
 
 # Static web UI is bundled read-only (BASE_DIR = _MEIPASS in frozen mode;
 # project root in dev). Uploaded media lives under USER_DATA_DIR/media which
@@ -55,7 +55,7 @@ app.include_router(settings.router)
 
 @app.get("/api/version")
 async def api_version():
-    return {"version": __version__}
+    return {"version": SERVER_VERSION}
 
 
 # ── HTML page routes ───────────────────────────────────────────────────────────

@@ -1,8 +1,8 @@
-"""Single source of truth for the Rudi application version.
+"""Version numbers for the Rudi application.
 
-Update __version__ here; the server, instructor app, and student web UI all
-pull from this file (the web UI fetches it at runtime via GET /api/version).
+__version__     — instructor desktop app (Windows installer, title bar)
+SERVER_VERSION  — server (returned by GET /api/version, shown in student UI)
 """
 
-__version__ = "0.5.2"
-VERSION = __version__
+__version__ = "0.9.0"
+SERVER_VERSION = "0.6.0"
