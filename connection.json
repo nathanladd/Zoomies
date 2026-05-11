@@ -1,6 +1,6 @@
 {
-  "server_host": "localhost",
-  "server_port": 5000,
+  "server_host": "rudi-server.duckdns.org",
+  "server_port": 443,
   "username": "instructor",
   "password": "rudi"
 }

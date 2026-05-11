@@ -6,7 +6,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-VERSION=$(python3 -c "exec(open('version.py').read()); print(__version__)")
+VERSION=$(python -c "exec(open('version.py').read()); print(__version__)")
 OUTDIR="dist/rudi-server-${VERSION}"
 
 rm -rf "$OUTDIR"

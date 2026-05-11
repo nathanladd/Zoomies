@@ -24,6 +24,7 @@ class LogWebSocketThread(QThread):
     """Background thread that connects to the server's /ws/logs endpoint
     and emits each log line as a signal for the server console."""
     line_received = pyqtSignal(str)
+    status_changed = pyqtSignal(str)  # connection status messages
 
     def __init__(self, host: str, port: int, token: str | None = None):
         super().__init__()
@@ -34,6 +35,7 @@ class LogWebSocketThread(QThread):
 
     def run(self):
         if not HAS_WEBSOCKETS:
+            self.status_changed.emit("[Log] websockets package not installed")
             return
         self._running = True
         loop = asyncio.new_event_loop()
@@ -43,20 +45,25 @@ class LogWebSocketThread(QThread):
 
     async def _listen(self):
         suffix = f"?token={self.token}" if self.token else ""
-        url = f"ws://{self.host}:{self.port}/ws/logs{suffix}"
+        ws_scheme = "wss" if self.port == 443 else "ws"
+        url = f"{ws_scheme}://{self.host}:{self.port}/ws/logs{suffix}"
+        self.status_changed.emit(f"[Log] Connecting to {url} ...")
         while self._running:
             try:
                 async with websockets.connect(url) as ws:
+                    self.status_changed.emit("[Log] Connected — streaming server output")
                     while self._running:
                         try:
                             line = await asyncio.wait_for(ws.recv(), timeout=0.5)
                             self.line_received.emit(line)
                         except asyncio.TimeoutError:
                             continue
-            except Exception:
+                    self.status_changed.emit("[Log] Disconnected")
+            except Exception as exc:
                 if not self._running:
                     break
-                await asyncio.sleep(2)  # retry after delay
+                self.status_changed.emit(f"[Log] Connection failed: {exc} — retrying in 2s")
+                await asyncio.sleep(2)
 
     def stop(self):
         self._running = False
@@ -86,7 +93,8 @@ class WebSocketThread(QThread):
 
     async def _connect(self):
         suffix = f"?token={self.token}" if self.token else ""
-        uri = f"ws://{self.host}:{self.port}/ws/instructor/{self.game_id}{suffix}"
+        ws_scheme = "wss" if self.port == 443 else "ws"
+        uri = f"{ws_scheme}://{self.host}:{self.port}/ws/instructor/{self.game_id}{suffix}"
         print(f"[INSTR-WS] Connecting to {uri}")
         try:
             async with websockets.connect(uri) as ws:
@@ -766,6 +774,7 @@ class GameControlPanel(QWidget):
             token=getattr(self.api, "token", None),
         )
         self._log_ws.line_received.connect(self._append_server_log)
+        self._log_ws.status_changed.connect(self._append_server_log)
         self._log_ws.start()
 
     def _append_server_log(self, line: str):
@@ -780,7 +789,8 @@ class GameControlPanel(QWidget):
         """Poll /api/version and update the label."""
         try:
             import httpx
-            url = f"http://{self.server_host}:{self.server_port}/api/version"
+            http_scheme = "https" if self.server_port == 443 else "http"
+            url = f"{http_scheme}://{self.server_host}:{self.server_port}/api/version"
             r = httpx.get(url, timeout=1.0)
             if r.status_code == 200:
                 v = r.json().get("version", "?")

@@ -48,10 +48,14 @@ def _acquire_singleton_mutex() -> None:
         _SINGLETON_MUTEX_HANDLE = None
 
 
+def _http_scheme(port: int) -> str:
+    return "https" if port == 443 else "http"
+
+
 def _check_server_reachable(host: str, port: int, timeout_s: float = 5.0) -> bool:
     """Quick check that the remote server is responding."""
     deadline = time.monotonic() + timeout_s
-    url = f"http://{host}:{port}/api/topics"
+    url = f"{_http_scheme(port)}://{host}:{port}/api/topics"
     while time.monotonic() < deadline:
         try:
             r = httpx.get(url, timeout=1.0)
@@ -111,7 +115,7 @@ class MainWindow(QMainWindow):
         conn = load_connection()
         self.server_host: str = conn["server_host"]
         self.server_port: int = conn["server_port"]
-        base_url = f"http://{self.server_host}:{self.server_port}"
+        base_url = f"{_http_scheme(self.server_port)}://{self.server_host}:{self.server_port}"
         self.api = ApiClient(base_url=base_url)
 
         if not _check_server_reachable(self.server_host, self.server_port):
