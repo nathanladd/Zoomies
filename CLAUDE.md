@@ -1,0 +1,1 @@
+reference C:\Users\natha\OneDrive\Documents\Vault\CLAUDE.md for project outline and planning context. Record new project planning and instructions here as well. 

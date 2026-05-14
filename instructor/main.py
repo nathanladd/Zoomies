@@ -1,17 +1,12 @@
 import sys
-import time
 
-import httpx
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QDockWidget, QWidget,
-    QStatusBar, QMessageBox, QDialog, QVBoxLayout,
-    QFormLayout, QLineEdit, QDialogButtonBox, QLabel,
+    QApplication, QMainWindow, QDockWidget, QWidget, QStatusBar,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 
 from instructor.api_client import ApiClient
-from instructor.connection_settings import load as load_connection, save as save_connection
 from instructor.core.question_pool import QuestionPool
 from instructor.core.quiz_builder import QuizBuilder
 from instructor.game.control_panel import GameControlPanel
@@ -48,110 +43,21 @@ def _acquire_singleton_mutex() -> None:
         _SINGLETON_MUTEX_HANDLE = None
 
 
-def _http_scheme(port: int) -> str:
-    return "https" if port == 443 else "http"
-
-
-def _check_server_reachable(host: str, port: int, timeout_s: float = 5.0) -> bool:
-    """Quick check that the remote server is responding."""
-    deadline = time.monotonic() + timeout_s
-    url = f"{_http_scheme(port)}://{host}:{port}/api/topics"
-    while time.monotonic() < deadline:
-        try:
-            r = httpx.get(url, timeout=1.0)
-            if r.status_code < 500:
-                return True
-        except Exception:
-            pass
-        time.sleep(0.25)
-    return False
-
-
-class LoginDialog(QDialog):
-    """Ask for username and password. Pre-fills from stored credentials."""
-
-    def __init__(self, username: str = "", password: str = "", parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Rudi — Instructor Login")
-        self.setMinimumWidth(320)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Enter your instructor credentials:"))
-
-        form = QFormLayout()
-        self.username_edit = QLineEdit(username)
-        self.password_edit = QLineEdit(password)
-        self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        form.addRow("Username:", self.username_edit)
-        form.addRow("Password:", self.password_edit)
-        layout.addLayout(form)
-
-        self.error_label = QLabel("")
-        self.error_label.setStyleSheet("color: #f87171;")
-        self.error_label.setWordWrap(True)
-        layout.addWidget(self.error_label)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-    def credentials(self) -> tuple[str, str]:
-        return self.username_edit.text().strip(), self.password_edit.text()
-
-    def show_error(self, msg: str) -> None:
-        self.error_label.setText(msg)
-
-
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, api: ApiClient, server_host: str, server_port: int):
         super().__init__()
         self.setWindowTitle(f"Rudi v{__version__}")
         self.setMinimumSize(1000, 700)
 
-        # Load connection settings and create the API client.
-        conn = load_connection()
-        self.server_host: str = conn["server_host"]
-        self.server_port: int = conn["server_port"]
-        base_url = f"{_http_scheme(self.server_port)}://{self.server_host}:{self.server_port}"
-        self.api = ApiClient(base_url=base_url)
-
-        if not _check_server_reachable(self.server_host, self.server_port):
-            QMessageBox.warning(
-                self, "Server unreachable",
-                f"Cannot reach the Rudi server at {base_url}.\n\n"
-                "Check that the server is running and the Connection settings are correct.",
-            )
-        else:
-            self._do_login(conn)
+        self.server_host = server_host
+        self.server_port = server_port
+        self.api = api
 
         self._build_ui()
         self._build_menu()
-        self.statusBar().showMessage(f"Connected to server at {base_url}")
-        # Apply the canonical three-thirds right-side layout once the window
-        # has a real size (resizeDocks needs that to split evenly).
+        self.statusBar().showMessage(f"Connected to server at {api.base_url}")
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self._apply_default_view)
-
-    def _do_login(self, conn: dict) -> None:
-        """Attempt login with stored credentials; show dialog on failure."""
-        username = conn.get("username", "instructor")
-        password = conn.get("password", "rudi")
-        while True:
-            try:
-                self.api.login(username, password)
-                # Persist successful credentials
-                save_connection(self.server_host, self.server_port, username, password)
-                return
-            except Exception:
-                dlg = LoginDialog(username=username, password="", parent=self)
-                dlg.show_error("Login failed — check your username and password.")
-                if dlg.exec() != QDialog.DialogCode.Accepted:
-                    # User cancelled — proceed without auth (API calls will fail with 401)
-                    return
-                username, password = dlg.credentials()
 
     def _build_ui(self):
         # Tabs for content management
@@ -356,7 +262,18 @@ def main():
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
     app.setPalette(palette)
 
-    window = MainWindow()
+    from instructor.ui.splash_screen import StartupDialog
+    splash = StartupDialog()
+    splash.exec()
+    if splash.api_client is None:
+        sys.exit(0)
+
+    conn = splash.conn
+    window = MainWindow(
+        api=splash.api_client,
+        server_host=conn["server_host"],
+        server_port=conn["server_port"],
+    )
     window.show()
     sys.exit(app.exec())
 
