@@ -30,8 +30,8 @@ DefaultGroupName={#AppDisplayName}
 DisableProgramGroupPage=yes
 OutputDir=..\dist\installer
 OutputBaseFilename=Rudi-Setup-{#AppVersion}
-#if FileExists(AddBackslash(SourcePath) + "rudi.ico")
-SetupIconFile={#SourcePath}\rudi.ico
+#if FileExists(AddBackslash(SourcePath) + "Rudi_App_Icon.ico")
+SetupIconFile={#SourcePath}\Rudi_App_Icon.ico
 #endif
 UninstallDisplayIcon={app}\{#AppExeName}
 Compression=lzma2/ultra

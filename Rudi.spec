@@ -66,7 +66,7 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-_icon = PROJECT_ROOT / "installer" / "rudi.ico"
+_icon = PROJECT_ROOT / "installer" / "Rudi_App_Icon.ico"
 _icon_arg = str(_icon) if _icon.exists() else None
 
 # Instructor GUI: windowless (no console window flashing on startup).
