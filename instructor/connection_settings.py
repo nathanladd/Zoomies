@@ -17,7 +17,12 @@ _DEFAULTS = {
 def _settings_path() -> Path:
     """Return the path to the connection settings JSON file."""
     if getattr(sys, "frozen", False):
-        # Frozen build: store next to the executable
+        # Frozen build: %LOCALAPPDATA%\Rudi is the user-writable data dir
+        # (the app installs to Program Files which is read-only for normal users).
+        import os
+        local_app_data = os.environ.get("LOCALAPPDATA", "")
+        if local_app_data:
+            return Path(local_app_data) / "Rudi" / "connection.json"
         return Path(sys.executable).parent / "connection.json"
     # Dev: store in the repo root (next to run_instructor.py)
     return Path(__file__).resolve().parent.parent / "connection.json"

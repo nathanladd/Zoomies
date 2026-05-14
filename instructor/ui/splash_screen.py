@@ -136,7 +136,10 @@ class StartupDialog(QDialog):
             self._show_form(conn)
             return
 
-        save_connection(host, port, username, password)
+        try:
+            save_connection(host, port, username, password)
+        except Exception as exc:
+            self._log_line(f"  Warning: could not save connection settings: {exc}", color="#fbbf24")
         self._log_line("  OK — authenticated", color="#4ade80")
         self._log_line("Ready.")
 
