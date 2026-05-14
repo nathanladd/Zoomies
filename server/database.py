@@ -61,8 +61,8 @@ def _run_lightweight_migrations(sync_conn) -> None:
             "ALTER TABLE games ADD COLUMN join_code TEXT"
         ))
         # Assign codes to any existing games that don't have one.
-        import secrets, string
-        _CHARS = string.ascii_uppercase + string.digits
+        import secrets
+        _CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
         rows = sync_conn.execute(text("SELECT id FROM games WHERE join_code IS NULL")).fetchall()
         for (game_id,) in rows:
             while True:
