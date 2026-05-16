@@ -317,7 +317,10 @@ class GameControlPanel(QWidget):
         self.lb_table = QTableWidget()
         self.lb_table.setColumnCount(4)
         self.lb_table.setHorizontalHeaderLabels(["Rank", "Name", "Answer", "Score"])
-        self.lb_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        _hdr = self.lb_table.horizontalHeader()
+        for _i in range(4):
+            _hdr.setSectionResizeMode(_i, QHeaderView.ResizeMode.ResizeToContents)
+        _hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.lb_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         lb_layout.addWidget(self.lb_table)
 

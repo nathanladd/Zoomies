@@ -717,8 +717,10 @@ class QuestionPool(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels(["ID", "Type", "Text", "Correct", "Topic", "Time", "Image"])
-        self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        _hdr = self.table.horizontalHeader()
+        for _i in range(7):
+            _hdr.setSectionResizeMode(_i, QHeaderView.ResizeMode.ResizeToContents)
+        _hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
