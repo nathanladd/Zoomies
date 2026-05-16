@@ -4,9 +4,10 @@ import threading
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QMessageBox, QComboBox, QGroupBox, QTableWidget, QTableWidgetItem,
-    QHeaderView, QPlainTextEdit,
+    QHeaderView, QPlainTextEdit, QSpinBox, QCheckBox,
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread
+from PyQt6.QtGui import QKeySequence, QShortcut
 
 from instructor.api_client import ApiClient
 from instructor.game.projection_window import ProjectionWindow
@@ -167,6 +168,8 @@ class GameControlPanel(QWidget):
         # Cleared on every new question_start and on game_end.
         self._answer_status: dict[int, bool] = {}
         self._log_ws: LogWebSocketThread | None = None
+        self._quiz_question_counts: dict[int, int] = {}
+        self._quiz_randomize_defaults: dict[int, bool] = {}
         self._build_ui()
         # Marshal background-thread stat results back onto the GUI thread.
         self._stats_loaded.connect(self._on_stats_loaded)
@@ -175,6 +178,8 @@ class GameControlPanel(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        layout.setContentsMargins(10, 10, 10, 10)
 
         # ── Setup Group ────────────────────────────────────────────────────
         setup_group = QGroupBox("Game Setup")
@@ -183,6 +188,7 @@ class GameControlPanel(QWidget):
         row1 = QHBoxLayout()
         self.quiz_combo = QComboBox()
         self.quiz_combo.setMinimumWidth(250)
+        self.quiz_combo.currentIndexChanged.connect(self._on_quiz_selection_changed)
         btn_refresh = QPushButton("Refresh")
         btn_refresh.clicked.connect(self._refresh_quizzes)
         self.btn_create_game = QPushButton("New Game")
@@ -199,6 +205,25 @@ class GameControlPanel(QWidget):
         row1.addWidget(self.btn_create_game)
         row1.addStretch()
         setup_layout.addLayout(row1)
+
+        row2 = QHBoxLayout()
+        self.total_questions_label = QLabel("Total questions: —")
+        self.total_questions_label.setStyleSheet("color: #94a3b8; font-size: 12px;")
+        self.question_count_spin = QSpinBox()
+        self.question_count_spin.setMinimum(1)
+        self.question_count_spin.setMaximum(1)
+        self.question_count_spin.setValue(1)
+        self.question_count_spin.setEnabled(False)
+        self.question_count_spin.setToolTip("Number of questions to include (randomly selected)")
+        self.randomize_order_check = QCheckBox("Randomize order")
+        row2.addWidget(self.total_questions_label)
+        row2.addSpacing(16)
+        row2.addWidget(QLabel("Questions to use:"))
+        row2.addWidget(self.question_count_spin)
+        row2.addSpacing(16)
+        row2.addWidget(self.randomize_order_check)
+        row2.addStretch()
+        setup_layout.addLayout(row2)
 
         layout.addWidget(setup_group)
 
@@ -223,6 +248,7 @@ class GameControlPanel(QWidget):
         self.btn_next = QPushButton("First Question")
         self.btn_next.clicked.connect(self._next_question)
         self.btn_next.setEnabled(False)
+        self.btn_next.setToolTip("Space")
         self.btn_reveal = QPushButton("Reveal Answer")
         self.btn_reveal.clicked.connect(self._reveal)
         self.btn_reveal.setEnabled(False)
@@ -316,16 +342,42 @@ class GameControlPanel(QWidget):
         )
         srv_layout.addWidget(self.server_console)
 
+        space_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Space), self)
+        space_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        space_shortcut.activated.connect(self.btn_next.click)
+
         layout.addStretch(1)
 
     def _refresh_quizzes(self):
         self.quiz_combo.clear()
+        self._quiz_question_counts = {}
+        self._quiz_randomize_defaults = {}
         try:
             quizzes = self.api.list_quizzes()
             for qz in quizzes:
-                self.quiz_combo.addItem(f"{qz['name']} ({qz.get('question_count', 0)} Q's)", qz["id"])
+                count = qz.get("question_count", 0)
+                self._quiz_question_counts[qz["id"]] = count
+                self._quiz_randomize_defaults[qz["id"]] = qz.get("randomize_order", False)
+                self.quiz_combo.addItem(qz["name"], qz["id"])
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to load quizzes: {e}")
+        self._on_quiz_selection_changed()
+
+    def _on_quiz_selection_changed(self):
+        quiz_id = self.quiz_combo.currentData()
+        count = self._quiz_question_counts.get(quiz_id, 0) if quiz_id is not None else 0
+        if count > 0:
+            self.total_questions_label.setText(f"Total questions: {count}")
+            self.question_count_spin.setMaximum(count)
+            self.question_count_spin.setValue(count)
+            self.question_count_spin.setEnabled(True)
+        else:
+            self.total_questions_label.setText("Total questions: —")
+            self.question_count_spin.setMaximum(1)
+            self.question_count_spin.setValue(1)
+            self.question_count_spin.setEnabled(False)
+        randomize_default = self._quiz_randomize_defaults.get(quiz_id, False) if quiz_id is not None else False
+        self.randomize_order_check.setChecked(randomize_default)
 
     def _create_game(self):
         quiz_id = self.quiz_combo.currentData()
@@ -342,7 +394,14 @@ class GameControlPanel(QWidget):
             game = self.api.create_game(quiz_id)
             self.current_game_id = game["id"]
             self.current_join_code = game.get("join_code")
-            self.api.init_game(self.current_game_id)
+            total = self._quiz_question_counts.get(quiz_id, 0)
+            selected = self.question_count_spin.value()
+            question_count = selected if selected < total else None
+            self.api.init_game(
+                self.current_game_id,
+                question_count=question_count,
+                randomize_order=self.randomize_order_check.isChecked(),
+            )
             code_display = self.current_join_code or str(self.current_game_id)
             self.game_label.setText(f"Game #{self.current_game_id} — Code: {code_display} (waiting)")
         except Exception as e:

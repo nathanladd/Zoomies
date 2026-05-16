@@ -67,6 +67,7 @@ class MainWindow(QMainWindow):
         # button that asks us to open it on the Topics tab.
         if hasattr(self.question_pool, "topics_requested"):
             self.question_pool.topics_requested.connect(self._open_topics_settings)
+        self.quiz_builder.edit_question_requested.connect(self._open_question_editor)
 
         # Game panel is the main window's central widget
         self.game_panel = GameControlPanel(
@@ -172,6 +173,13 @@ class MainWindow(QMainWindow):
 
         # View menu — dock visibility toggles + projection window toggle
         view_menu = menubar.addMenu("&View")
+
+        default_view_action = QAction("&Default View", self)
+        default_view_action.triggered.connect(self._apply_default_view)
+        view_menu.addAction(default_view_action)
+
+        view_menu.addSeparator()
+
         for dock in (self.dock_questions, self.dock_quizzes):
             action = dock.toggleViewAction()  # checkable, auto-synced with the dock
             view_menu.addAction(action)
@@ -179,12 +187,6 @@ class MainWindow(QMainWindow):
         view_menu.addSeparator()
         for dock in (self.dock_leaderboard, self.dock_server_console):
             view_menu.addAction(dock.toggleViewAction())
-
-        view_menu.addSeparator()
-
-        default_view_action = QAction("&Default View", self)
-        default_view_action.triggered.connect(self._apply_default_view)
-        view_menu.addAction(default_view_action)
 
         view_menu.addSeparator()
 
@@ -217,6 +219,11 @@ class MainWindow(QMainWindow):
 
     def _open_topics_settings(self):
         self._open_settings(SettingsWindow.TAB_TOPICS)
+
+    def _open_question_editor(self, question_id: int):
+        self.dock_questions.show()
+        self.dock_questions.raise_()
+        self.question_pool.edit_question_by_id(question_id)
 
     def closeEvent(self, event):
         # ProjectionWindow is a parentless top-level window, so closing the
@@ -261,6 +268,32 @@ def main():
     palette.setColor(QPalette.ColorRole.Highlight, QColor(99, 102, 241))
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
     app.setPalette(palette)
+    app.setStyleSheet("""
+        QGroupBox {
+            font-size: 13px;
+            font-weight: bold;
+            border: 1px solid #3f3f5a;
+            border-radius: 6px;
+            margin-top: 14px;
+            padding-top: 4px;
+            background-color: #1e1e30;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            padding: 2px 8px;
+            color: #a5b4fc;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        QDockWidget::title {
+            font-size: 13px;
+            font-weight: bold;
+            color: #a5b4fc;
+            background-color: #252538;
+            padding: 4px 8px;
+        }
+    """)
 
     from instructor.ui.splash_screen import StartupDialog
     splash = StartupDialog()

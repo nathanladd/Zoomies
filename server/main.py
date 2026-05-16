@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, WebSocket, Depends
+from pydantic import BaseModel
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -78,10 +79,15 @@ async def play_game():
 
 # ── Engine bootstrap + WebSocket endpoints ──────────────────────────────────────────────
 
+class _InitBody(BaseModel):
+    question_count: int | None = None
+    randomize_order: bool | None = None
+
+
 @app.post("/api/games/{game_id}/init", dependencies=[Depends(require_auth)])
-async def init_game_engine(game_id: int, db: AsyncSession = Depends(get_db)):
+async def init_game_engine(game_id: int, body: _InitBody = _InitBody(), db: AsyncSession = Depends(get_db)):
     try:
-        engine = await load_engine(game_id, db)
+        engine = await load_engine(game_id, db, question_count=body.question_count, randomize_order=body.randomize_order)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return {"status": "ok", "game_id": game_id, "question_count": engine.question_count}

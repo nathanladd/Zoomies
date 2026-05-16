@@ -1,5 +1,6 @@
 import asyncio
 import json
+import random
 from datetime import datetime, timezone
 from typing import Any
 
@@ -57,7 +58,7 @@ async def _record_answer_stat(question_id: int, answer_text: str, delta: int = 1
             await db.rollback()
 
 
-async def load_engine(game_id: int, db: AsyncSession) -> GameEngine:
+async def load_engine(game_id: int, db: AsyncSession, question_count: int | None = None, randomize_order: bool | None = None) -> GameEngine:
     """Initialize a Rudi game engine for the given game."""
     game = await db.get(Game, game_id)
     if not game:
@@ -93,11 +94,15 @@ async def load_engine(game_id: int, db: AsyncSession) -> GameEngine:
             "correct_index": q.correct_index,
         })
 
+    if question_count is not None and 0 < question_count < len(questions):
+        questions = random.sample(questions, question_count)
+
+    use_randomize = randomize_order if randomize_order is not None else quiz.randomize_order
     engine = GameEngine(
         game_id=game_id,
         quiz_name=quiz.name,
         questions=questions,
-        randomize_order=quiz.randomize_order,
+        randomize_order=use_randomize,
     )
     active_games[game_id] = engine
     if game.join_code:

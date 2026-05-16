@@ -49,6 +49,8 @@ class QuizDialog(QDialog):
 
 
 class QuizBuilder(QWidget):
+    edit_question_requested = pyqtSignal(int)  # emits question_id
+
     def __init__(self, api: ApiClient):
         super().__init__()
         self.api = api
@@ -119,6 +121,7 @@ class QuizBuilder(QWidget):
         self.q_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.q_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.q_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.q_table.doubleClicked.connect(self._on_question_double_clicked)
         right_layout.addWidget(self.q_table)
 
         splitter.addWidget(left)
@@ -166,6 +169,13 @@ class QuizBuilder(QWidget):
             text = (q.get("text") or "")[:60]
             self.q_table.setItem(row, 3, QTableWidgetItem(text))
             self.q_table.setItem(row, 4, QTableWidgetItem(f"{q.get('time_seconds', 10)}s"))
+
+    def _on_question_double_clicked(self):
+        row = self.q_table.currentRow()
+        if row < 0:
+            return
+        qid = int(self.q_table.item(row, 1).text())
+        self.edit_question_requested.emit(qid)
 
     def create_quiz(self):
         dlg = QuizDialog(self)

@@ -422,7 +422,7 @@ class QuestionDialog(QDialog):
         disabled regardless of any prior user/saved value. For other types, the
         default is only applied when the user hasn't explicitly toggled it.
         """
-        if qtype == "technician_ab":
+        if qtype in ("technician_ab", "true_false"):
             self.randomize_check.blockSignals(True)
             self.randomize_check.setChecked(False)
             self.randomize_check.blockSignals(False)
@@ -815,17 +815,12 @@ class QuestionPool(QWidget):
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Failed to create question: {e}")
 
-    def edit_question(self):
-        qid = self._selected_question_id()
-        if qid is None:
-            QMessageBox.information(self, "Info", "Select a question first.")
-            return
+    def edit_question_by_id(self, qid: int):
         try:
             question = self.api.get_question(qid)
         except Exception as e:
             QMessageBox.warning(self, "Error", str(e))
             return
-
         dlg = QuestionDialog(self.api, self, question)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             data = dlg.get_data()
@@ -845,6 +840,13 @@ class QuestionPool(QWidget):
                 self.refresh()
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Failed to update question: {e}")
+
+    def edit_question(self):
+        qid = self._selected_question_id()
+        if qid is None:
+            QMessageBox.information(self, "Info", "Select a question first.")
+            return
+        self.edit_question_by_id(qid)
 
     def delete_question(self):
         qid = self._selected_question_id()

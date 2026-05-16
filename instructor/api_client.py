@@ -164,8 +164,13 @@ class ApiClient:
     def create_game(self, quiz_id: int) -> dict[str, Any]:
         return self.client.post("/api/games", json={"quiz_id": quiz_id}).json()
 
-    def init_game(self, game_id: int) -> dict[str, Any]:
-        return self.client.post(f"/api/games/{game_id}/init").json()
+    def init_game(self, game_id: int, question_count: int | None = None, randomize_order: bool | None = None) -> dict[str, Any]:
+        body: dict[str, Any] = {}
+        if question_count is not None:
+            body["question_count"] = question_count
+        if randomize_order is not None:
+            body["randomize_order"] = randomize_order
+        return self.client.post(f"/api/games/{game_id}/init", json=body).json()
 
     def end_game(self, game_id: int) -> dict[str, Any]:
         return self.client.put(f"/api/games/{game_id}/end").json()
