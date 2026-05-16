@@ -251,6 +251,12 @@ def main():
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
 
+    from pathlib import Path
+    from PyQt6.QtGui import QIcon
+    _icon_path = Path(__file__).parent.parent / "installer" / "Rudi_App_Icon.ico"
+    if _icon_path.exists():
+        app.setWindowIcon(QIcon(str(_icon_path)))
+
     # Dark palette
     from PyQt6.QtGui import QPalette, QColor
     palette = QPalette()
