@@ -33,6 +33,13 @@ build/
 *.swp
 *.swo
 
+# Logs
+*.log
+*.err
+
+# Secrets
+jwt_secret.txt
+
 # OS
 Thumbs.db
 .DS_Store
