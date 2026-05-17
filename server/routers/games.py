@@ -13,8 +13,8 @@ from server.schemas import GameCreate, GameRead, PlayerRead
 
 router = APIRouter(prefix="/api/games", tags=["games"], dependencies=[Depends(require_auth)])
 
-# Exclude visually ambiguous characters: O/0, I/1, L
-_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+# Exclude visually ambiguous characters: O, I, L
+_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ"
 
 
 async def _unique_join_code(db: AsyncSession) -> str:
