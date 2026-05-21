@@ -137,14 +137,3 @@ class PlayerRead(BaseModel):
     joined_at: datetime
 
     model_config = {"from_attributes": True}
-
-
-# ── Admin (backup / restore) ───────────────────────────────────────────────────
-
-class BackupResult(BaseModel):
-    path: str
-    size_bytes: int
-    created_at: datetime
-
-class RestoreRequest(BaseModel):
-    path: str
