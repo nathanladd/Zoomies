@@ -1,7 +1,9 @@
+import io
 import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from PIL import Image, UnidentifiedImageError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -204,6 +206,12 @@ async def upload_image(
     data = await file.read()
     if len(data) > MAX_IMAGE_SIZE:
         raise HTTPException(400, "Image exceeds 5 MB limit")
+
+    try:
+        img = Image.open(io.BytesIO(data))
+        img.verify()
+    except (UnidentifiedImageError, Exception):
+        raise HTTPException(400, "File is not a valid image")
 
     if q.image_filename:
         old = MEDIA_DIR / q.image_filename
