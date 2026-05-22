@@ -35,6 +35,7 @@ class LogBroadcaster:
         for name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
             logger = logging.getLogger(name)
             logger.addHandler(handler)
+            logger.propagate = False
 
     # ── client management ────────────────────────────────────────────────
 
