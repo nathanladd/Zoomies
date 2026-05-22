@@ -147,8 +147,8 @@ async def handle_student_ws(ws: WebSocket, game_id: int) -> None:
             return
 
         name = data.get("name", "").strip()
-        if not name:
-            await ws.close(code=4002, reason="Name is required")
+        if not name or len(name) > 30:
+            await ws.close(code=4002, reason="Name must be 1–30 characters")
             return
 
         # Reuse an existing Player row for this (game_id, name) if one exists —

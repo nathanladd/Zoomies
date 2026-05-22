@@ -1,5 +1,5 @@
 from sqlalchemy import event
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import create_async_db_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
 from server.config import DATABASE_URL, DATA_DIR, MEDIA_DIR
@@ -9,10 +9,10 @@ class Base(DeclarativeBase):
     pass
 
 
-engine = create_async_engine(DATABASE_URL, echo=False)
+db_engine = create_async_db_engine(DATABASE_URL, echo=False)
 
 
-@event.listens_for(engine.sync_engine, "connect")
+@event.listens_for(db_engine.sync_db_engine, "connect")
 def _enable_sqlite_fk(dbapi_connection, connection_record):  # noqa: ARG001
     """SQLite ignores ON DELETE CASCADE unless foreign keys are explicitly enabled per connection."""
     try:
@@ -23,11 +23,11 @@ def _enable_sqlite_fk(dbapi_connection, connection_record):  # noqa: ARG001
         pass
 
 
-async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+async_session = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
 
 
 async def init_db() -> None:
-    async with engine.begin() as conn:
+    async with db_engine.begin() as conn:
         from server.models import (  # noqa: F401
             Topic, Question, Quiz, QuizQuestion,
             Game, Player, QuestionAnswerStat,
