@@ -1,5 +1,6 @@
 import json
 import threading
+from collections import deque
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
@@ -85,7 +86,7 @@ class WebSocketThread(QThread):
         self._running = False
         self._ws = None
         self._loop = None
-        self._send_queue: list[str] = []
+        self._send_queue: deque[str] = deque()
 
     def run(self):
         self._loop = asyncio.new_event_loop()
@@ -107,7 +108,7 @@ class WebSocketThread(QThread):
                 while self._running:
                     # Send any queued messages
                     while self._send_queue:
-                        msg = self._send_queue.pop(0)
+                        msg = self._send_queue.popleft()
                         print(f"[INSTR-WS] Sending: {msg}")
                         await ws.send(msg)
 

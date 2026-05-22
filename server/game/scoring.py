@@ -15,7 +15,3 @@ def calculate_points(elapsed_ms: int, total_ms: int) -> int:
     remaining_ratio = 1 - (elapsed_ms / total_ms)
     return max(POINTS_MIN, interpolate(remaining_ratio))
 
-
-def points_at_time(elapsed_ms: int, total_ms: int) -> int:
-    """Return the current available points at a given elapsed time."""
-    return calculate_points(elapsed_ms, total_ms)

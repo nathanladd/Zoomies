@@ -27,8 +27,6 @@ async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit
 
 
 async def init_db() -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    MEDIA_DIR.mkdir(parents=True, exist_ok=True)
     async with engine.begin() as conn:
         from server.models import (  # noqa: F401
             Topic, Question, Quiz, QuizQuestion,
