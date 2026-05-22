@@ -60,6 +60,11 @@ async def api_version():
 
 # ── HTML page routes ───────────────────────────────────────────────────────────
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse(str(BASE_DIR / "static" / "favicon.ico"))
+
+
 @app.get("/")
 async def index():
     return FileResponse(
