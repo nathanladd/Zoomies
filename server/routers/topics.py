@@ -16,15 +16,18 @@ async def list_topics(db: AsyncSession = Depends(get_db)):
     result = await db.execute(stmt)
     topics = result.scalars().all()
 
-    out: list[TopicRead] = []
-    for t in topics:
-        count_stmt = select(func.count()).where(Question.topic_id == t.id)
-        count = (await db.execute(count_stmt)).scalar() or 0
-        out.append(TopicRead(
+    counts = dict(
+        (await db.execute(
+            select(Question.topic_id, func.count()).group_by(Question.topic_id)
+        )).all()
+    )
+    return [
+        TopicRead(
             id=t.id, name=t.name, description=t.description,
-            created_at=t.created_at, question_count=count,
-        ))
-    return out
+            created_at=t.created_at, question_count=counts.get(t.id, 0),
+        )
+        for t in topics
+    ]
 
 
 @router.get("/{topic_id}", response_model=TopicRead)

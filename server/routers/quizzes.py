@@ -34,17 +34,19 @@ async def list_quizzes(db: AsyncSession = Depends(get_db)):
     stmt = select(Quiz).order_by(Quiz.id.desc())
     result = await db.execute(stmt)
     quizzes = result.scalars().all()
-    out: list[QuizRead] = []
-    for qz in quizzes:
-        cnt = (await db.execute(
-            select(func.count()).where(QuizQuestion.quiz_id == qz.id)
-        )).scalar() or 0
-        out.append(QuizRead(
+    counts = dict(
+        (await db.execute(
+            select(QuizQuestion.quiz_id, func.count()).group_by(QuizQuestion.quiz_id)
+        )).all()
+    )
+    return [
+        QuizRead(
             id=qz.id, name=qz.name, description=qz.description,
             randomize_order=qz.randomize_order, created_at=qz.created_at,
-            question_count=cnt,
-        ))
-    return out
+            question_count=counts.get(qz.id, 0),
+        )
+        for qz in quizzes
+    ]
 
 
 @router.get("/{quiz_id}", response_model=QuizDetailRead)

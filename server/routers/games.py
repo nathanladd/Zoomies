@@ -50,14 +50,31 @@ async def list_games(
     result = await db.execute(stmt)
     games = result.scalars().all()
 
-    out: list[GameRead] = []
-    for g in games:
-        cnt = (await db.execute(
-            select(func.count()).where(Player.game_id == g.id)
-        )).scalar() or 0
-        quiz_name = g.quiz.name if g.quiz else None
-        out.append(_game_to_read(g, cnt, quiz_name))
-    return out
+    game_ids = [g.id for g in games]
+    quiz_ids = list({g.quiz_id for g in games if g.quiz_id is not None})
+
+    player_counts: dict = {}
+    if game_ids:
+        player_counts = dict(
+            (await db.execute(
+                select(Player.game_id, func.count())
+                .where(Player.game_id.in_(game_ids))
+                .group_by(Player.game_id)
+            )).all()
+        )
+
+    quiz_names: dict = {}
+    if quiz_ids:
+        quiz_names = dict(
+            (await db.execute(
+                select(Quiz.id, Quiz.name).where(Quiz.id.in_(quiz_ids))
+            )).all()
+        )
+
+    return [
+        _game_to_read(g, player_counts.get(g.id, 0), quiz_names.get(g.quiz_id))
+        for g in games
+    ]
 
 
 @router.get("/{game_id}", response_model=GameRead)
