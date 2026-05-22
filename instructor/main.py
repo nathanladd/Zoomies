@@ -313,6 +313,7 @@ def main():
         server_host=conn["server_host"],
         server_port=conn["server_port"],
     )
+    window.setWindowIcon(app.windowIcon())
     window.show()
     sys.exit(app.exec())
 
