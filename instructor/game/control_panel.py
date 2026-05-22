@@ -153,6 +153,7 @@ class GameControlPanel(QWidget):
     # to /api/questions/{id}/stats finishes. Carries (question_id, stats_dict)
     # so the GUI slot can verify the result still matches the active question.
     _stats_loaded = pyqtSignal(int, dict)
+    _version_loaded = pyqtSignal(str, str)  # (label_text, stylesheet)
 
     def __init__(self, api: ApiClient, server_host: str = "localhost", server_port: int = 5000):
         super().__init__()
@@ -173,6 +174,7 @@ class GameControlPanel(QWidget):
         self._build_ui()
         # Marshal background-thread stat results back onto the GUI thread.
         self._stats_loaded.connect(self._on_stats_loaded)
+        self._version_loaded.connect(self._on_version_loaded)
         self._connect_log_ws()
         self._refresh_quizzes()
 
@@ -848,21 +850,27 @@ class GameControlPanel(QWidget):
     # ── Server version ─────────────────────────────────────────────────────────────
 
     def _refresh_server_version(self) -> None:
-        """Poll /api/version and update the label."""
-        try:
-            import httpx
-            http_scheme = "https" if self.server_port == 443 else "http"
-            url = f"{http_scheme}://{self.server_host}:{self.server_port}/api/version"
-            r = httpx.get(url, timeout=1.0)
-            if r.status_code == 200:
-                v = r.json().get("version", "?")
-                self.server_version_label.setText(f"Server: v{v}")
-                self.server_version_label.setStyleSheet("color: #34d399; padding: 0 6px;")
-                return
-        except Exception:
-            pass
-        self.server_version_label.setText("Server: offline")
-        self.server_version_label.setStyleSheet("color: #f87171; padding: 0 6px;")
+        """Poll /api/version on a worker thread to avoid blocking the GUI."""
+        http_scheme = "https" if self.server_port == 443 else "http"
+        url = f"{http_scheme}://{self.server_host}:{self.server_port}/api/version"
+
+        def _worker() -> None:
+            try:
+                import httpx
+                r = httpx.get(url, timeout=1.0)
+                if r.status_code == 200:
+                    v = r.json().get("version", "?")
+                    self._version_loaded.emit(f"Server: v{v}", "color: #34d399; padding: 0 6px;")
+                    return
+            except Exception:
+                pass
+            self._version_loaded.emit("Server: offline", "color: #f87171; padding: 0 6px;")
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_version_loaded(self, text: str, style: str) -> None:
+        self.server_version_label.setText(text)
+        self.server_version_label.setStyleSheet(style)
 
     def closeEvent(self, event):
         if self._log_ws:
