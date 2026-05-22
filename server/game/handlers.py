@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.database import async_session
@@ -160,7 +160,7 @@ async def handle_student_ws(ws: WebSocket, game_id: int) -> None:
             existing = (await db.execute(
                 select(Player).where(
                     Player.game_id == game_id,
-                    Player.name == name,
+                    func.lower(Player.name) == name.lower(),
                 )
             )).scalar_one_or_none()
             if existing is not None:
