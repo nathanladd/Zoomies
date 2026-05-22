@@ -55,16 +55,24 @@ class ApiClient:
     # ── Topics ─────────────────────────────────────────────────────────────
 
     def list_topics(self) -> list[dict[str, Any]]:
-        return self.client.get("/api/topics").json()
+        resp = self.client.get("/api/topics")
+        _raise_for_status(resp)
+        return resp.json()
 
     def get_topic(self, topic_id: int) -> dict[str, Any]:
-        return self.client.get(f"/api/topics/{topic_id}").json()
+        resp = self.client.get(f"/api/topics/{topic_id}")
+        _raise_for_status(resp)
+        return resp.json()
 
     def create_topic(self, name: str, description: str | None = None) -> dict[str, Any]:
-        return self.client.post("/api/topics", json={"name": name, "description": description}).json()
+        resp = self.client.post("/api/topics", json={"name": name, "description": description})
+        _raise_for_status(resp)
+        return resp.json()
 
     def update_topic(self, topic_id: int, **kwargs) -> dict[str, Any]:
-        return self.client.put(f"/api/topics/{topic_id}", json=kwargs).json()
+        resp = self.client.put(f"/api/topics/{topic_id}", json=kwargs)
+        _raise_for_status(resp)
+        return resp.json()
 
     def delete_topic(self, topic_id: int) -> None:
         resp = self.client.delete(f"/api/topics/{topic_id}")
@@ -76,16 +84,24 @@ class ApiClient:
         params = {}
         if topic_id is not None:
             params["topic_id"] = topic_id
-        return self.client.get("/api/questions", params=params).json()
+        resp = self.client.get("/api/questions", params=params)
+        _raise_for_status(resp)
+        return resp.json()
 
     def get_question(self, question_id: int) -> dict[str, Any]:
-        return self.client.get(f"/api/questions/{question_id}").json()
+        resp = self.client.get(f"/api/questions/{question_id}")
+        _raise_for_status(resp)
+        return resp.json()
 
     def create_question(self, data: dict[str, Any]) -> dict[str, Any]:
-        return self.client.post("/api/questions", json=data).json()
+        resp = self.client.post("/api/questions", json=data)
+        _raise_for_status(resp)
+        return resp.json()
 
     def update_question(self, question_id: int, data: dict[str, Any]) -> dict[str, Any]:
-        return self.client.put(f"/api/questions/{question_id}", json=data).json()
+        resp = self.client.put(f"/api/questions/{question_id}", json=data)
+        _raise_for_status(resp)
+        return resp.json()
 
     def delete_question(self, question_id: int) -> None:
         resp = self.client.delete(f"/api/questions/{question_id}")
@@ -97,10 +113,12 @@ class ApiClient:
                 f"/api/questions/{question_id}/image",
                 files={"file": f},
             )
+        _raise_for_status(resp)
         return resp.json()
 
     def delete_image(self, question_id: int) -> None:
-        self.client.delete(f"/api/questions/{question_id}/image")
+        resp = self.client.delete(f"/api/questions/{question_id}/image")
+        _raise_for_status(resp)
 
     def get_question_stats(self, question_id: int) -> dict[str, Any]:
         resp = self.client.get(f"/api/questions/{question_id}/stats")
@@ -119,18 +137,26 @@ class ApiClient:
     # ── Quizzes ────────────────────────────────────────────────────────────
 
     def list_quizzes(self) -> list[dict[str, Any]]:
-        return self.client.get("/api/quizzes").json()
+        resp = self.client.get("/api/quizzes")
+        _raise_for_status(resp)
+        return resp.json()
 
     def get_quiz(self, quiz_id: int) -> dict[str, Any]:
-        return self.client.get(f"/api/quizzes/{quiz_id}").json()
+        resp = self.client.get(f"/api/quizzes/{quiz_id}")
+        _raise_for_status(resp)
+        return resp.json()
 
     def create_quiz(self, name: str, description: str | None = None, randomize_order: bool = False) -> dict[str, Any]:
-        return self.client.post("/api/quizzes", json={
+        resp = self.client.post("/api/quizzes", json={
             "name": name, "description": description, "randomize_order": randomize_order,
-        }).json()
+        })
+        _raise_for_status(resp)
+        return resp.json()
 
     def update_quiz(self, quiz_id: int, **kwargs) -> dict[str, Any]:
-        return self.client.put(f"/api/quizzes/{quiz_id}", json=kwargs).json()
+        resp = self.client.put(f"/api/quizzes/{quiz_id}", json=kwargs)
+        _raise_for_status(resp)
+        return resp.json()
 
     def delete_quiz(self, quiz_id: int) -> None:
         resp = self.client.delete(f"/api/quizzes/{quiz_id}")
@@ -140,16 +166,21 @@ class ApiClient:
         data: dict[str, Any] = {"question_id": question_id}
         if position is not None:
             data["position"] = position
-        return self.client.post(f"/api/quizzes/{quiz_id}/questions", json=data).json()
+        resp = self.client.post(f"/api/quizzes/{quiz_id}/questions", json=data)
+        _raise_for_status(resp)
+        return resp.json()
 
     def reorder_quiz_questions(self, quiz_id: int, question_ids: list[int]) -> list[dict[str, Any]]:
-        return self.client.put(
+        resp = self.client.put(
             f"/api/quizzes/{quiz_id}/questions/reorder",
             json={"question_ids": question_ids},
-        ).json()
+        )
+        _raise_for_status(resp)
+        return resp.json()
 
     def remove_question_from_quiz(self, quiz_id: int, question_id: int) -> None:
-        self.client.delete(f"/api/quizzes/{quiz_id}/questions/{question_id}")
+        resp = self.client.delete(f"/api/quizzes/{quiz_id}/questions/{question_id}")
+        _raise_for_status(resp)
 
     # ── Games ──────────────────────────────────────────────────────────────
 
@@ -159,10 +190,14 @@ class ApiClient:
             params["quiz_id"] = quiz_id
         if status is not None:
             params["status"] = status
-        return self.client.get("/api/games", params=params).json()
+        resp = self.client.get("/api/games", params=params)
+        _raise_for_status(resp)
+        return resp.json()
 
     def create_game(self, quiz_id: int) -> dict[str, Any]:
-        return self.client.post("/api/games", json={"quiz_id": quiz_id}).json()
+        resp = self.client.post("/api/games", json={"quiz_id": quiz_id})
+        _raise_for_status(resp)
+        return resp.json()
 
     def init_game(self, game_id: int, question_count: int | None = None, randomize_order: bool | None = None) -> dict[str, Any]:
         body: dict[str, Any] = {}
@@ -170,25 +205,34 @@ class ApiClient:
             body["question_count"] = question_count
         if randomize_order is not None:
             body["randomize_order"] = randomize_order
-        return self.client.post(f"/api/games/{game_id}/init", json=body).json()
+        resp = self.client.post(f"/api/games/{game_id}/init", json=body)
+        _raise_for_status(resp)
+        return resp.json()
 
     def end_game(self, game_id: int) -> dict[str, Any]:
-        return self.client.put(f"/api/games/{game_id}/end").json()
+        resp = self.client.put(f"/api/games/{game_id}/end")
+        _raise_for_status(resp)
+        return resp.json()
 
     def get_game(self, game_id: int) -> dict[str, Any]:
-        return self.client.get(f"/api/games/{game_id}").json()
+        resp = self.client.get(f"/api/games/{game_id}")
+        _raise_for_status(resp)
+        return resp.json()
 
     def get_game_players(self, game_id: int) -> list[dict[str, Any]]:
-        return self.client.get(f"/api/games/{game_id}/players").json()
+        resp = self.client.get(f"/api/games/{game_id}/players")
+        _raise_for_status(resp)
+        return resp.json()
 
     def delete_game(self, game_id: int) -> None:
-        self.client.delete(f"/api/games/{game_id}")
+        resp = self.client.delete(f"/api/games/{game_id}")
+        _raise_for_status(resp)
 
     # ── Settings (scoring curve) ───────────────────────────────────────────
 
     def get_scoring(self) -> dict[str, Any]:
         resp = self.client.get("/api/settings/scoring")
-        resp.raise_for_status()
+        _raise_for_status(resp)
         return resp.json()
 
     def set_scoring(self, points: list[dict[str, Any]]) -> dict[str, Any]:
@@ -197,12 +241,12 @@ class ApiClient:
             json={"points": points},
             timeout=10.0,
         )
-        resp.raise_for_status()
+        _raise_for_status(resp)
         return resp.json()
 
     def get_elimination(self) -> dict[str, Any]:
         resp = self.client.get("/api/settings/elimination")
-        resp.raise_for_status()
+        _raise_for_status(resp)
         return resp.json()
 
     def set_elimination(self, marks: list[float]) -> dict[str, Any]:
@@ -211,5 +255,5 @@ class ApiClient:
             json={"marks": marks},
             timeout=10.0,
         )
-        resp.raise_for_status()
+        _raise_for_status(resp)
         return resp.json()
