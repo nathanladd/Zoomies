@@ -293,7 +293,7 @@ class GameEngine(BaseGame):
                 random.shuffle(order)
             choices = [f"{labels[i]}) {order[i]}" for i in range(2)]
             correct_text = "True" if qdata["correct_answer"].lower() == "true" else "False"
-            correct = next(c for c in choices if c.endswith(f") {correct_text}"))
+            correct = next((c for c in choices if c.endswith(f") {correct_text}")), None) or choices[0]
             return choices, correct
 
         if qtype == "technician_ab":
@@ -310,7 +310,7 @@ class GameEngine(BaseGame):
             if randomize:
                 random.shuffle(order)
             choices = [f"{labels[i]}) {order[i]}" for i in range(4)]
-            correct = next(c for c in choices if c.endswith(f") {correct_phrase}"))
+            correct = next((c for c in choices if c.endswith(f") {correct_phrase}")), None) or choices[0]
             return choices, correct
 
         # multiple_choice
@@ -333,5 +333,5 @@ class GameEngine(BaseGame):
             ordered.insert(correct_idx, correct_text)
             raw = ordered[:len(raw)]
         choices = [f"{labels[i]}) {raw[i]}" for i in range(len(raw))]
-        correct = next(c for c in choices if c.endswith(f") {qdata['correct_answer']}"))
+        correct = next((c for c in choices if c.endswith(f") {qdata['correct_answer']}")), None) or choices[0]
         return choices, correct

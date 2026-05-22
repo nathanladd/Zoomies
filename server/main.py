@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, WebSocket, Depends
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends
 from pydantic import BaseModel
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -127,7 +127,7 @@ async def ws_logs(websocket: WebSocket, token: str | None = None):
     try:
         while True:
             await websocket.receive_text()  # keep-alive; client won't send much
-    except Exception:
+    except WebSocketDisconnect:
         pass
     finally:
         await broadcaster.disconnect(websocket)
