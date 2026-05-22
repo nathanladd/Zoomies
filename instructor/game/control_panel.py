@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QHeaderView, QPlainTextEdit, QSpinBox, QCheckBox,
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread
-from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtGui import QKeySequence, QPixmap, QShortcut
 
 from instructor.api_client import ApiClient
 from instructor.game.projection_window import ProjectionWindow
@@ -155,6 +155,7 @@ class GameControlPanel(QWidget):
     # so the GUI slot can verify the result still matches the active question.
     _stats_loaded = pyqtSignal(int, dict)
     _version_loaded = pyqtSignal(str, str)  # (label_text, stylesheet)
+    _image_loaded = pyqtSignal(str, object)  # (image_url key, raw bytes or None)
 
     def __init__(self, api: ApiClient, server_host: str = "localhost", server_port: int = 5000):
         super().__init__()
@@ -172,10 +173,12 @@ class GameControlPanel(QWidget):
         self._log_ws: LogWebSocketThread | None = None
         self._quiz_question_counts: dict[int, int] = {}
         self._quiz_randomize_defaults: dict[int, bool] = {}
+        self._current_image_url: str | None = None
         self._build_ui()
         # Marshal background-thread stat results back onto the GUI thread.
         self._stats_loaded.connect(self._on_stats_loaded)
         self._version_loaded.connect(self._on_version_loaded)
+        self._image_loaded.connect(self._on_image_loaded)
         self._connect_log_ws()
         self._refresh_quizzes()
 
@@ -296,6 +299,11 @@ class GameControlPanel(QWidget):
         self.qa_question_label.setWordWrap(True)
         self.qa_question_label.setStyleSheet("font-size: 14px; font-weight: bold; padding: 4px;")
         qa_layout.addWidget(self.qa_question_label)
+        self.qa_image_label = QLabel()
+        self.qa_image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.qa_image_label.setStyleSheet("padding: 4px;")
+        self.qa_image_label.hide()
+        qa_layout.addWidget(self.qa_image_label)
         self.qa_choices_layout = QVBoxLayout()
         qa_layout.addLayout(self.qa_choices_layout)
         self._qa_choice_labels: list[QLabel] = []
@@ -678,6 +686,11 @@ class GameControlPanel(QWidget):
 
     def _show_question(self, msg: dict):
         self.qa_question_label.setText(msg.get("text", ""))
+        image_url = msg.get("image_url")
+        self._current_image_url = image_url
+        self.qa_image_label.hide()
+        if image_url:
+            self._fetch_image_async(image_url)
         # Clear old choice + stat labels
         self._clear_choice_rows()
         # Add new choice labels with a paired stat label on the right
@@ -715,6 +728,38 @@ class GameControlPanel(QWidget):
         if len(text) > 3 and text[0] in "ABCD" and text[1:3] == ") ":
             return text[3:]
         return text
+
+    def _fetch_image_async(self, image_url: str) -> None:
+        http_scheme = "https" if self.server_port == 443 else "http"
+        full_url = f"{http_scheme}://{self.server_host}:{self.server_port}/{image_url.lstrip('/')}"
+
+        def _worker():
+            try:
+                import httpx
+                resp = httpx.get(full_url, timeout=5.0)
+                data = resp.content if resp.status_code == 200 else None
+            except Exception:
+                data = None
+            self._image_loaded.emit(image_url, data)
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_image_loaded(self, image_url: str, data: object) -> None:
+        if self._current_image_url != image_url:
+            return  # stale result from a previous question
+        if not data:
+            self.qa_image_label.hide()
+            return
+        pixmap = QPixmap()
+        pixmap.loadFromData(data)
+        if pixmap.isNull():
+            self.qa_image_label.hide()
+            return
+        max_h = 180
+        if pixmap.height() > max_h:
+            pixmap = pixmap.scaledToHeight(max_h, Qt.TransformationMode.SmoothTransformation)
+        self.qa_image_label.setPixmap(pixmap)
+        self.qa_image_label.show()
 
     def _fetch_question_stats_async(self, question_id: int | None) -> None:
         """Fetch cumulative pick rates on a worker thread and emit the result
@@ -786,6 +831,9 @@ class GameControlPanel(QWidget):
 
     def _clear_question(self):
         self.qa_question_label.setText("")
+        self.qa_image_label.hide()
+        self.qa_image_label.clear()
+        self._current_image_url = None
         self._clear_choice_rows()
         self.qa_stats_summary.setText("")
         self._current_question_id = None

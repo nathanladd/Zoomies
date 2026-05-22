@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QProgressBar, QFrame, QSizePolicy, QSplitter,
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from PyQt6.QtGui import QFont, QColor, QPalette, QKeyEvent, QPixmap, QMouseEvent
 
 from version import __version__
@@ -14,6 +14,8 @@ class ProjectionWindow(QWidget):
     Shows question text, optional image, timer, answer count, and leaderboard.
     Answer choices are NOT shown here — students see them on their own devices.
     """
+
+    _image_loaded = pyqtSignal(str, object)  # (image_url key, raw bytes or None)
 
     def __init__(self, game_id: int | None = None, join_code: str | None = None, server_host: str = "localhost", server_port: int = 5000):
         super().__init__()
@@ -31,6 +33,8 @@ class ProjectionWindow(QWidget):
         self._player_count = 0
         self._player_names: list[str] = []
         self._drag_pos = None
+        self._current_image_url: str | None = None
+        self._image_loaded.connect(self._on_image_loaded)
         self._build_ui()
         self._build_fullscreen_hint()
         self._build_version_label()
@@ -342,35 +346,51 @@ class ProjectionWindow(QWidget):
         self.question_label.setFont(QFont("Segoe UI", 30, QFont.Weight.Bold))
         self.question_label.setStyleSheet("color: #e2e8f0; padding: 24px;")
 
-        # Show image if provided (fetched from the remote server over HTTP)
+        # Fetch image on a background thread so the GUI never blocks waiting
+        # for the HTTP response. _on_image_loaded is called on the GUI thread
+        # via the signal once the bytes arrive (or fail).
         image_url = msg.get("image_url")
+        self._current_image_url = image_url
+        self.image_label.hide()
         if image_url:
-            try:
-                import httpx
-                url = f"http://{self.server_host}:{self.server_port}/{image_url.lstrip('/')}"
-                resp = httpx.get(url, timeout=5.0)
-                if resp.status_code == 200:
-                    pixmap = QPixmap()
-                    pixmap.loadFromData(resp.content)
-                    if not pixmap.isNull():
-                        scaled = pixmap.scaledToHeight(
-                            min(350, pixmap.height()),
-                            Qt.TransformationMode.SmoothTransformation,
-                        )
-                        self.image_label.setPixmap(scaled)
-                        self.image_label.show()
-                    else:
-                        self.image_label.hide()
-                else:
-                    self.image_label.hide()
-            except Exception:
-                self.image_label.hide()
-        else:
-            self.image_label.hide()
+            self._fetch_image_async(image_url)
 
         self.timer_text.setText(f"{msg.get('time_seconds', 10)}s")
         self.answers_label.setText("Answers: 0/?")
         self._current_time_seconds = msg.get("time_seconds", 10)
+
+    def _fetch_image_async(self, image_url: str) -> None:
+        import threading
+        http_scheme = "https" if self.server_port == 443 else "http"
+        full_url = f"{http_scheme}://{self.server_host}:{self.server_port}/{image_url.lstrip('/')}"
+
+        def _worker():
+            try:
+                import httpx
+                resp = httpx.get(full_url, timeout=5.0)
+                data = resp.content if resp.status_code == 200 else None
+            except Exception:
+                data = None
+            self._image_loaded.emit(image_url, data)
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_image_loaded(self, image_url: str, data: object) -> None:
+        if self._current_image_url != image_url:
+            return  # stale result from a previous question
+        if not data:
+            self.image_label.hide()
+            return
+        pixmap = QPixmap()
+        pixmap.loadFromData(data)
+        if pixmap.isNull():
+            self.image_label.hide()
+            return
+        max_h = min(350, max(100, self.height() // 3))
+        if pixmap.height() > max_h:
+            pixmap = pixmap.scaledToHeight(max_h, Qt.TransformationMode.SmoothTransformation)
+        self.image_label.setPixmap(pixmap)
+        self.image_label.show()
 
     def on_points_update(self, msg: dict):
         remaining_ms = msg.get("time_remaining_ms", 0)
