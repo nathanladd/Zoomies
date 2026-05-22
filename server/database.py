@@ -1,5 +1,5 @@
 from sqlalchemy import event
-from sqlalchemy.ext.asyncio import create_async_db_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
 from server.config import DATABASE_URL, DATA_DIR, MEDIA_DIR
@@ -9,7 +9,7 @@ class Base(DeclarativeBase):
     pass
 
 
-db_engine = create_async_db_engine(DATABASE_URL, echo=False)
+db_engine = create_async_engine(DATABASE_URL, echo=False)
 
 
 @event.listens_for(db_engine.sync_db_engine, "connect")
