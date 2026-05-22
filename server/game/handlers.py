@@ -291,7 +291,7 @@ async def handle_student_ws(ws: WebSocket, game_id: int) -> None:
                     "type": "player_left",
                     "player_id": player_id,
                     "name": name,
-                    "player_count": len(engine.players) - 1,
+                    "player_count": manager.get_student_count(game_id),
                 })
 
 
