@@ -12,7 +12,7 @@ class Base(DeclarativeBase):
 db_engine = create_async_engine(DATABASE_URL, echo=False)
 
 
-@event.listens_for(db_engine.sync_db_engine, "connect")
+@event.listens_for(db_engine.sync_engine, "connect")
 def _enable_sqlite_fk(dbapi_connection, connection_record):  # noqa: ARG001
     """SQLite ignores ON DELETE CASCADE unless foreign keys are explicitly enabled per connection."""
     try:
