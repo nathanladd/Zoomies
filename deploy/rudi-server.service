@@ -7,7 +7,7 @@ Type=simple
 User=rudi
 Group=rudi
 WorkingDirectory=/opt/rudi
-ExecStart=/opt/rudi/venv/bin/python run_server.py
+ExecStart=/opt/rudi/venv/bin/uvicorn server.main:app --host 0.0.0.0 --port 5000
 Restart=on-failure
 RestartSec=5
 Environment=RUDI_DATA_DIR=/opt/rudi/data

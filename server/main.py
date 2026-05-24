@@ -13,7 +13,7 @@ from server.routers import topics, questions, quizzes, games, settings
 from server.routers import auth as auth_router
 from server.game.handlers import (
     load_engine, handle_student_ws, handle_instructor_ws,
-    join_codes,
+    join_codes, active_games,
 )
 from server.log_broadcast import broadcaster
 from version import SERVER_VERSION
@@ -56,6 +56,11 @@ app.include_router(settings.router)
 @app.get("/api/version")
 async def api_version():
     return {"version": SERVER_VERSION}
+
+
+@app.get("/api/status")
+async def api_status():
+    return {"active_games": len(active_games)}
 
 
 # ── HTML page routes ───────────────────────────────────────────────────────────
