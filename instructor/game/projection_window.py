@@ -26,7 +26,7 @@ class ProjectionWindow(QWidget):
         self.server_port = server_port
         self.setWindowTitle(f"Rudi v{__version__} — Projection")
         self.setMinimumSize(1024, 700)
-        self.setStyleSheet("background-color: #0f172a; color: white;")
+        self.setStyleSheet("background-color: #FFFFFF; color: #333333;")
 
         self._is_waiting = False
         self._join_url = ""
@@ -102,7 +102,7 @@ class ProjectionWindow(QWidget):
             "Press F11 for fullscreen  ·  Esc to exit", self,
         )
         self.fullscreen_hint.setStyleSheet(
-            "color: #475569; background: transparent; font-size: 11px;"
+            "color: #AAAAAA; background: transparent; font-size: 11px;"
         )
         self.fullscreen_hint.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.fullscreen_hint.adjustSize()
@@ -124,7 +124,7 @@ class ProjectionWindow(QWidget):
     def _build_version_label(self):
         self.version_label = QLabel(f"v{__version__}", self)
         self.version_label.setStyleSheet(
-            "color: #475569; background: transparent; font-size: 11px;"
+            "color: #AAAAAA; background: transparent; font-size: 11px;"
         )
         self.version_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.version_label.adjustSize()
@@ -146,11 +146,11 @@ class ProjectionWindow(QWidget):
         header = QHBoxLayout()
         self.progress_label = QLabel("")
         self.progress_label.setFont(QFont("Segoe UI", 18))
-        self.progress_label.setStyleSheet("color: #94a3b8;")
+        self.progress_label.setStyleSheet("color: #555555;")
 
         self.points_label = QLabel("")
         self.points_label.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
-        self.points_label.setStyleSheet("color: #34d399;")
+        self.points_label.setStyleSheet("color: #0078D4;")
         self.points_label.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         header.addWidget(self.progress_label)
@@ -166,12 +166,12 @@ class ProjectionWindow(QWidget):
         self.timer_bar.setMaximumHeight(14)
         self.timer_bar.setStyleSheet("""
             QProgressBar {
-                background-color: #334155;
+                background-color: #E0E0E0;
                 border-radius: 7px;
             }
             QProgressBar::chunk {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #6366f1, stop:1 #10b981);
+                    stop:0 #0078D4, stop:1 #00A4C8);
                 border-radius: 7px;
             }
         """)
@@ -182,7 +182,7 @@ class ProjectionWindow(QWidget):
         self.question_label.setFont(QFont("Segoe UI", 30, QFont.Weight.Bold))
         self.question_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.question_label.setWordWrap(True)
-        self.question_label.setStyleSheet("color: #e2e8f0; padding: 24px;")
+        self.question_label.setStyleSheet("color: #222222; padding: 24px;")
         self.question_label.setMinimumHeight(120)
         self.main_layout.addWidget(self.question_label)
 
@@ -197,12 +197,12 @@ class ProjectionWindow(QWidget):
         footer = QHBoxLayout()
         self.answers_label = QLabel("")
         self.answers_label.setFont(QFont("Segoe UI", 16))
-        self.answers_label.setStyleSheet("color: #94a3b8;")
+        self.answers_label.setStyleSheet("color: #555555;")
         self.answers_label.setTextFormat(Qt.TextFormat.RichText)
         self.answers_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.timer_text = QLabel("")
         self.timer_text.setFont(QFont("Segoe UI", 36, QFont.Weight.Bold))
-        self.timer_text.setStyleSheet("color: #fbbf24;")
+        self.timer_text.setStyleSheet("color: #0078D4;")
         self.timer_text.setAlignment(Qt.AlignmentFlag.AlignRight)
         footer.addWidget(self.answers_label)
         footer.addStretch()
@@ -214,7 +214,7 @@ class ProjectionWindow(QWidget):
         self.correct_label.setFont(QFont("Segoe UI", 26, QFont.Weight.Bold))
         self.correct_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.correct_label.setStyleSheet(
-            "color: #10b981; background-color: #064e3b; border-radius: 12px; padding: 16px;"
+            "color: #2E7D32; background-color: #C8E6C9; border-radius: 12px; padding: 16px;"
         )
         self.correct_label.hide()
         self.main_layout.addWidget(self.correct_label)
@@ -222,7 +222,7 @@ class ProjectionWindow(QWidget):
         # ── Leaderboard area ──────────────────────────────────────────────
         self.lb_title = QLabel("")
         self.lb_title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
-        self.lb_title.setStyleSheet("color: #818cf8; padding-top: 8px;")
+        self.lb_title.setStyleSheet("color: #0078D4; padding-top: 8px;")
         self.lb_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lb_title.hide()
         self.main_layout.addWidget(self.lb_title)
@@ -269,26 +269,26 @@ class ProjectionWindow(QWidget):
         names_html = ""
         if self._player_names:
             name_spans = "&nbsp;&nbsp;&bull;&nbsp;&nbsp;".join(
-                f'<span style="color:#e2e8f0;">{n}</span>' for n in self._player_names
+                f'<span style="color:#333333;">{n}</span>' for n in self._player_names
             )
             names_html = (
-                f'<div style="font-size:20px; color:#94a3b8; margin-top:16px; '
+                f'<div style="font-size:20px; color:#555555; margin-top:16px; '
                 f'line-height:1.6;">{name_spans}</div>'
             )
         self.question_label.setText(
             f'<div style="text-align:center;">'
-            f'<div style="font-size:64px; font-weight:bold; color:#818cf8; margin-bottom:12px; letter-spacing:2px;">RUDI</div>'
-            f'<div style="font-size:18px; font-style:italic; color:#cbd5e1; margin-bottom:6px; line-height:1.4;">'
+            f'<div style="font-size:64px; font-weight:bold; color:#0078D4; margin-bottom:12px; letter-spacing:2px;">RUDI</div>'
+            f'<div style="font-size:18px; font-style:italic; color:#555555; margin-bottom:6px; line-height:1.4;">'
             f'Named for Rudolf Christian Karl Diesel &mdash.'
             f'</div>'
-            f'<div style="font-size:15px; color:#94a3b8; margin-bottom:14px;">A classroom quiz game.</div>'
-            f'<div style="font-size:17px; font-style:italic; color:#fbbf24; margin-bottom:24px;">'
+            f'<div style="font-size:15px; color:#777777; margin-bottom:14px;">A classroom quiz game.</div>'
+            f'<div style="font-size:17px; font-style:italic; color:#0078D4; margin-bottom:24px;">'
             f'&ldquo;Do not fear failure, but rather fear not trying at all.&rdquo; &mdash; Rudolf Diesel'
             f'</div>'
-            f'<div style="font-size:20px; color:#94a3b8; margin-bottom:4px;">Join at</div>'
-            f'<div style="font-size:40px; font-weight:bold; color:#818cf8; margin-bottom:16px;">{self._join_url}</div>'
-            f'<div style="font-size:32px; font-weight:bold; color:#34d399; margin-bottom:16px;">{game_text}</div>'
-            f'<div style="font-size:22px; color:#94a3b8;">{players_text}</div>'
+            f'<div style="font-size:20px; color:#555555; margin-bottom:4px;">Join at</div>'
+            f'<div style="font-size:40px; font-weight:bold; color:#0078D4; margin-bottom:16px;">{self._join_url}</div>'
+            f'<div style="font-size:32px; font-weight:bold; color:#2E7D32; margin-bottom:16px;">{game_text}</div>'
+            f'<div style="font-size:22px; color:#555555;">{players_text}</div>'
             f'{names_html}'
             f'</div>'
         )
@@ -304,7 +304,7 @@ class ProjectionWindow(QWidget):
         self.game_id = game_id
         self.join_code = join_code
         self.question_label.setFont(QFont("Segoe UI", 30, QFont.Weight.Bold))
-        self.question_label.setStyleSheet("color: #e2e8f0; padding: 24px;")
+        self.question_label.setStyleSheet("color: #222222; padding: 24px;")
         self._show_waiting()
 
     # ── Event handlers called by the control panel ─────────────────────────
@@ -328,7 +328,7 @@ class ProjectionWindow(QWidget):
         self.question_label.setMinimumHeight(120)
         self.question_label.setText("Get Ready!")
         self.question_label.setFont(QFont("Segoe UI", 40, QFont.Weight.Bold))
-        self.question_label.setStyleSheet("color: #e2e8f0; padding: 20px;")
+        self.question_label.setStyleSheet("color: #222222; padding: 20px;")
 
     def on_question_start(self, msg: dict):
         self.timer_bar.show()
@@ -344,7 +344,7 @@ class ProjectionWindow(QWidget):
 
         self.question_label.setText(msg.get("text") or "")
         self.question_label.setFont(QFont("Segoe UI", 30, QFont.Weight.Bold))
-        self.question_label.setStyleSheet("color: #e2e8f0; padding: 24px;")
+        self.question_label.setStyleSheet("color: #222222; padding: 24px;")
 
         # Fetch image on a background thread so the GUI never blocks waiting
         # for the HTTP response. _on_image_loaded is called on the GUI thread
@@ -437,7 +437,7 @@ class ProjectionWindow(QWidget):
 
         self.question_label.setText("GAME OVER!")
         self.question_label.setFont(QFont("Segoe UI", 52, QFont.Weight.Bold))
-        self.question_label.setStyleSheet("color: #fbbf24; padding: 20px;")
+        self.question_label.setStyleSheet("color: #0078D4; padding: 20px;")
         self.progress_label.setText("")
         self.points_label.setText("")
         self.timer_text.setText("")
@@ -493,7 +493,7 @@ class ProjectionWindow(QWidget):
             score_lbl = QLabel(f"{s.get('total_score', 0):,} pts")
             score_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             score_lbl.setFont(QFont("Segoe UI", 16))
-            score_lbl.setStyleSheet("color: #e2e8f0; background: transparent;")
+            score_lbl.setStyleSheet("color: #333333; background: transparent;")
 
             block = QFrame()
             block.setFixedHeight(heights[place])
@@ -507,7 +507,7 @@ class ProjectionWindow(QWidget):
             place_lbl = QLabel(str(place))
             place_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             place_lbl.setFont(QFont("Segoe UI", 48, QFont.Weight.Bold))
-            place_lbl.setStyleSheet("color: #0f172a; background: transparent;")
+            place_lbl.setStyleSheet("color: #333333; background: transparent;")
             block_layout.addWidget(place_lbl)
 
             col.addWidget(medal_lbl)
