@@ -13,6 +13,9 @@ env/
 data/*
 !data/.gitkeep
 
+# The .gitkeep is a dummy empty file whose only purpose is to keep the folder itself in git 
+# — otherwise git wouldn't track an empty directory at all.
+
 # Uploaded media (keep directory structure)
 media/questions/*
 !media/questions/.gitkeep
