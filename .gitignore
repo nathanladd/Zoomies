@@ -9,10 +9,9 @@ build/
 venv/
 env/
 
-# Database
-data/rudi.db
-data/zundpunkt.db
-data/pre-restore-*/
+# Data directory — all runtime files ignored, only the directory placeholder is tracked
+data/*
+!data/.gitkeep
 
 # Uploaded media (keep directory structure)
 media/questions/*
