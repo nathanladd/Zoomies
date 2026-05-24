@@ -200,10 +200,10 @@ class GameControlPanel(QWidget):
         self.btn_create_game = QPushButton("New Game")
         self.btn_create_game.clicked.connect(self._create_game)
         self.btn_create_game.setStyleSheet(
-            "QPushButton { background-color: #86efac; color: #052e16; "
+            "QPushButton { background-color: #2E7D32; color: white; "
             "font-weight: bold; padding: 4px 12px; border-radius: 4px; } "
-            "QPushButton:hover { background-color: #4ade80; } "
-            "QPushButton:pressed { background-color: #22c55e; }"
+            "QPushButton:hover { background-color: #1b5e20; } "
+            "QPushButton:pressed { background-color: #1b5e20; }"
         )
         row1.addWidget(QLabel("Quiz:"))
         row1.addWidget(self.quiz_combo)
@@ -214,7 +214,7 @@ class GameControlPanel(QWidget):
 
         row2 = QHBoxLayout()
         self.total_questions_label = QLabel("Total questions: —")
-        self.total_questions_label.setStyleSheet("color: #94a3b8; font-size: 12px;")
+        self.total_questions_label.setStyleSheet("color: #888888; font-size: 12px;")
         self.question_count_spin = QSpinBox()
         self.question_count_spin.setMinimum(1)
         self.question_count_spin.setMaximum(1)
@@ -268,10 +268,10 @@ class GameControlPanel(QWidget):
         # Applied after the shared style so it isn't overwritten.
         self.btn_end.setStyleSheet(
             "QPushButton { font-size: 14px; font-weight: bold; "
-            "background-color: #fca5a5; color: #450a0a; } "
-            "QPushButton:hover { background-color: #f87171; } "
-            "QPushButton:pressed { background-color: #ef4444; } "
-            "QPushButton:disabled { background-color: #4b1d1d; color: #9a6a6a; }"
+            "background-color: #ffe6e6; color: #cc0000; border: 1px solid #ffcccc; } "
+            "QPushButton:hover { background-color: #ffcccc; border-color: #ff9999; } "
+            "QPushButton:pressed { background-color: #ffb3b3; } "
+            "QPushButton:disabled { background-color: #f5f5f5; color: #aaaaaa; }"
         )
         btn_row.addWidget(self.btn_start)
         btn_row.addWidget(self.btn_next)
@@ -310,7 +310,7 @@ class GameControlPanel(QWidget):
         self._qa_stat_labels: list[QLabel] = []
         # Cumulative pick-rate row, refreshed on question_start and question_end.
         self.qa_stats_summary = QLabel("")
-        self.qa_stats_summary.setStyleSheet("color: #94a3b8; font-size: 11px; padding: 2px 4px;")
+        self.qa_stats_summary.setStyleSheet("color: #888888; font-size: 11px; padding: 2px 4px;")
         qa_layout.addWidget(self.qa_stats_summary)
         # question_id of the question currently shown in the panel; used to
         # decide which stats payload to apply when refreshes return.
@@ -342,7 +342,7 @@ class GameControlPanel(QWidget):
         srv_toolbar.setContentsMargins(0, 0, 0, 0)
         srv_toolbar.addStretch()
         self.server_version_label = QLabel("Server: …")
-        self.server_version_label.setStyleSheet("color: #94a3b8; padding: 0 6px;")
+        self.server_version_label.setStyleSheet("color: #888888; padding: 0 6px;")
         self.server_version_label.setToolTip("Version reported by GET /api/version")
         srv_toolbar.addWidget(self.server_version_label)
         srv_layout.addLayout(srv_toolbar)
@@ -352,7 +352,7 @@ class GameControlPanel(QWidget):
         self.server_console.setMaximumBlockCount(500)
         self.server_console.setStyleSheet(
             "font-family: Consolas, monospace; font-size: 11px; "
-            "background-color: #1a1a2e; color: #a5b4fc;"
+            "background-color: #FFFFFF; color: #333333;"
         )
         srv_layout.addWidget(self.server_console)
 
@@ -700,7 +700,7 @@ class GameControlPanel(QWidget):
             lbl = QLabel(f"  {choice}")
             lbl.setStyleSheet("font-size: 13px; padding: 2px 8px; border-radius: 4px;")
             stat = QLabel("")
-            stat.setStyleSheet("color: #94a3b8; font-size: 12px; padding: 2px 8px;")
+            stat.setStyleSheet("color: #888888; font-size: 12px; padding: 2px 8px;")
             stat.setMinimumWidth(80)
             stat.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             row.addWidget(lbl, 1)
@@ -826,7 +826,7 @@ class GameControlPanel(QWidget):
             if text == correct:
                 lbl.setStyleSheet(
                     "font-size: 13px; padding: 2px 8px; border-radius: 4px; "
-                    "background-color: #065f46; color: #34d399; font-weight: bold;"
+                    "background-color: #C8E6C9; color: #2E7D32; font-weight: bold;"
                 )
 
     def _clear_question(self):
@@ -909,11 +909,11 @@ class GameControlPanel(QWidget):
                 r = httpx.get(url, timeout=1.0)
                 if r.status_code == 200:
                     v = r.json().get("version", "?")
-                    self._version_loaded.emit(f"Server: v{v}", "color: #34d399; padding: 0 6px;")
+                    self._version_loaded.emit(f"Server: v{v}", "color: #2E7D32; padding: 0 6px;")
                     return
             except Exception:
                 pass
-            self._version_loaded.emit("Server: offline", "color: #f87171; padding: 0 6px;")
+            self._version_loaded.emit("Server: offline", "color: #E53935; padding: 0 6px;")
 
         threading.Thread(target=_worker, daemon=True).start()
 

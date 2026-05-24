@@ -257,46 +257,48 @@ def main():
     if _icon_path.exists():
         app.setWindowIcon(QIcon(str(_icon_path)))
 
-    # Dark palette
     from PyQt6.QtGui import QPalette, QColor
     palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window, QColor(30, 30, 40))
-    palette.setColor(QPalette.ColorRole.WindowText, QColor(220, 220, 230))
-    palette.setColor(QPalette.ColorRole.Base, QColor(25, 25, 35))
-    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(35, 35, 50))
-    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(40, 40, 55))
-    palette.setColor(QPalette.ColorRole.ToolTipText, QColor(220, 220, 230))
-    palette.setColor(QPalette.ColorRole.Text, QColor(220, 220, 230))
-    palette.setColor(QPalette.ColorRole.Button, QColor(40, 40, 55))
-    palette.setColor(QPalette.ColorRole.ButtonText, QColor(220, 220, 230))
-    palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 100, 100))
-    palette.setColor(QPalette.ColorRole.Link, QColor(99, 102, 241))
-    palette.setColor(QPalette.ColorRole.Highlight, QColor(99, 102, 241))
-    palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
+    palette.setColor(QPalette.ColorRole.Window,          QColor(0xF8, 0xF8, 0xF8))
+    palette.setColor(QPalette.ColorRole.WindowText,      QColor(0x33, 0x33, 0x33))
+    palette.setColor(QPalette.ColorRole.Base,            QColor(0xFF, 0xFF, 0xFF))
+    palette.setColor(QPalette.ColorRole.AlternateBase,   QColor(0xF8, 0xF8, 0xF8))
+    palette.setColor(QPalette.ColorRole.ToolTipBase,     QColor(0xFF, 0xFF, 0xFF))
+    palette.setColor(QPalette.ColorRole.ToolTipText,     QColor(0x33, 0x33, 0x33))
+    palette.setColor(QPalette.ColorRole.Text,            QColor(0x33, 0x33, 0x33))
+    palette.setColor(QPalette.ColorRole.Button,          QColor(0xF0, 0xF0, 0xF0))
+    palette.setColor(QPalette.ColorRole.ButtonText,      QColor(0x33, 0x33, 0x33))
+    palette.setColor(QPalette.ColorRole.BrightText,      QColor(0xFF, 0x00, 0x00))
+    palette.setColor(QPalette.ColorRole.Link,            QColor(0x00, 0x78, 0xD4))
+    palette.setColor(QPalette.ColorRole.Highlight,       QColor(0x00, 0x78, 0xD4))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor(0xFF, 0xFF, 0xFF))
     app.setPalette(palette)
     app.setStyleSheet("""
         QGroupBox {
             font-size: 13px;
             font-weight: bold;
-            border: 1px solid #3f3f5a;
+            border: 1px solid #C0C0C0;
             border-radius: 6px;
             margin-top: 14px;
             padding-top: 4px;
-            background-color: #1e1e30;
+            background-color: #FFFFFF;
         }
         QGroupBox::title {
             subcontrol-origin: margin;
             subcontrol-position: top left;
             padding: 2px 8px;
-            color: #a5b4fc;
+            color: #333333;
             font-size: 13px;
             font-weight: bold;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #EAF4FF, stop:1 #D8E9FF);
         }
         QDockWidget::title {
             font-size: 13px;
             font-weight: bold;
-            color: #a5b4fc;
-            background-color: #252538;
+            color: #333333;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #EAF4FF, stop:1 #D8E9FF);
             padding: 4px 8px;
         }
     """)

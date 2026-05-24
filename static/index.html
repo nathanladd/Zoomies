@@ -6,48 +6,60 @@
     <title>Rudi</title>
     <link rel="icon" href="/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: {
+                brand:        '#0078d4',
+                'brand-dark': '#106ebe',
+                surface:      '#F8F8F8',
+                caution:      '#F9A825',
+                success:      '#2E7D32',
+                danger:       '#E53935',
+            }}}
+        }
+    </script>
     <style>
-        body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); min-height: 100vh; }
-        .glow { text-shadow: 0 0 20px rgba(99, 102, 241, 0.5); }
+        body { background-color: #F8F8F8; min-height: 100vh; }
+        .glow { text-shadow: 0 0 20px rgba(0, 120, 212, 0.4); }
     </style>
 </head>
-<body class="text-white flex items-center justify-center min-h-screen">
+<body class="text-gray-800 flex items-center justify-center min-h-screen">
     <div class="text-center space-y-6 p-8 max-w-2xl">
-        <h1 class="text-6xl font-bold glow text-indigo-400 tracking-wider">RUDI</h1>
-        <p class="italic text-slate-300 text-base leading-relaxed">
+        <h1 class="text-6xl font-bold glow text-brand tracking-wider">RUDI</h1>
+        <p class="italic text-gray-500 text-base leading-relaxed">
             Named for Rudolf Christian Karl Diesel
         </p>
-        <p class="text-slate-400 text-sm -mt-4">A classroom quiz game.</p>
-        <p class="italic text-amber-400 text-base">
+        <p class="text-gray-400 text-sm -mt-4">A classroom quiz game.</p>
+        <p class="italic text-caution text-base">
             &ldquo;Do not fear failure, but rather fear not trying at all.&rdquo; &mdash; Rudolf Diesel
         </p>
 
-        <div id="join-form" class="bg-slate-800/80 backdrop-blur rounded-2xl p-8 max-w-md mx-auto space-y-6 shadow-2xl border border-slate-700">
-            <h2 class="text-2xl font-semibold">Join the Quiz</h2>
+        <div id="join-form" class="bg-white rounded-2xl p-8 max-w-md mx-auto space-y-6 shadow-md border border-gray-200">
+            <h2 class="text-2xl font-semibold text-gray-800">Join the Quiz</h2>
 
             <div>
                 <input id="player-name" type="text" placeholder="Enter your name"
-                    class="w-full px-4 py-3 rounded-xl bg-slate-700 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg"
+                    class="w-full px-4 py-3 rounded-xl bg-white border border-gray-300 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand text-lg"
                     maxlength="30" autocomplete="off">
             </div>
 
             <div>
                 <input id="game-id" type="text" placeholder="Game Code (e.g. K7XQ2M)"
-                    class="w-full px-4 py-3 rounded-xl bg-slate-700 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg tracking-widest uppercase"
+                    class="w-full px-4 py-3 rounded-xl bg-white border border-gray-300 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand text-lg tracking-widest uppercase"
                     maxlength="6" autocomplete="off" autocorrect="off" spellcheck="false">
             </div>
 
             <button id="join-btn" onclick="joinGame()"
-                class="w-full py-3 px-6 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-lg font-semibold transition-all duration-200 hover:scale-105 active:scale-95">
+                class="w-full py-3 px-6 bg-brand hover:bg-brand-dark text-white rounded-xl text-lg font-semibold transition-all duration-200 hover:scale-105 active:scale-95">
                 Join Game
             </button>
 
-            <p id="error-msg" class="text-red-400 text-sm hidden"></p>
+            <p id="error-msg" class="text-red-600 text-sm hidden"></p>
         </div>
     </div>
 
     <div id="version-badge"
-        class="fixed bottom-2 left-2 text-xs text-slate-600 select-none pointer-events-none"></div>
+        class="fixed bottom-2 left-2 text-xs text-gray-400 select-none pointer-events-none"></div>
 
     <script>
         fetch('/api/version').then(r => r.json()).then(d => {

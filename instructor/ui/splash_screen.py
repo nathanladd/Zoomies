@@ -118,19 +118,19 @@ class StartupDialog(QDialog):
         self._log_line(f"Connecting to {base_url} ...")
 
         if not self._check_reachable(host, port):
-            self._log_line(f"  FAILED — no response from {base_url}", color="#f87171")
+            self._log_line(f"  FAILED — no response from {base_url}", color="#E53935")
             self._log_line("Correct the settings below and click Retry.")
             self._show_form(conn)
             return
 
-        self._log_line("  OK — server is reachable", color="#4ade80")
+        self._log_line("  OK — server is reachable", color="#2E7D32")
         self._log_line(f"Authenticating as '{username}' ...")
 
         api = ApiClient(base_url=base_url)
         try:
             api.login(username, password)
         except Exception as exc:
-            self._log_line(f"  FAILED — {exc}", color="#f87171")
+            self._log_line(f"  FAILED — {exc}", color="#E53935")
             self._log_line("Correct the credentials below and click Retry.")
             api.close()
             self._show_form(conn)
@@ -139,8 +139,8 @@ class StartupDialog(QDialog):
         try:
             save_connection(host, port, username, password)
         except Exception as exc:
-            self._log_line(f"  Warning: could not save connection settings: {exc}", color="#fbbf24")
-        self._log_line("  OK — authenticated", color="#4ade80")
+            self._log_line(f"  Warning: could not save connection settings: {exc}", color="#F9A825")
+        self._log_line("  OK — authenticated", color="#2E7D32")
         self._log_line("Ready.")
 
         self.api_client = api
@@ -177,7 +177,7 @@ class StartupDialog(QDialog):
         try:
             port = int(self._port_edit.text().strip())
         except ValueError:
-            self._log_line("  ERROR: Port must be a number.", color="#f87171")
+            self._log_line("  ERROR: Port must be a number.", color="#E53935")
             return
 
         username = self._user_edit.text().strip()
