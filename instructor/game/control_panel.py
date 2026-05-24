@@ -330,8 +330,8 @@ class GameControlPanel(QWidget):
         self.lb_table.setHorizontalHeaderLabels(["Rank", "Name", "Answer", "Score"])
         _hdr = self.lb_table.horizontalHeader()
         for _i in range(4):
-            _hdr.setSectionResizeMode(_i, QHeaderView.ResizeMode.ResizeToContents)
-        _hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            _hdr.setSectionResizeMode(_i, QHeaderView.ResizeMode.Interactive)
+        _hdr.setStretchLastSection(False)
         self.lb_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         lb_layout.addWidget(self.lb_table)
 
@@ -683,6 +683,7 @@ class GameControlPanel(QWidget):
                 self._set_answer_cell(row, self._answer_status[pid])
             else:
                 self._set_answer_cell(row, None)
+        self.lb_table.resizeColumnsToContents()
 
     def _show_question(self, msg: dict):
         self.qa_question_label.setText(msg.get("text", ""))
@@ -847,6 +848,7 @@ class GameControlPanel(QWidget):
             self.lb_table.setItem(row, 1, QTableWidgetItem(name))
             self.lb_table.setItem(row, 3, QTableWidgetItem("0"))
             self._set_answer_cell(row, self._answer_status.get(pid))
+        self.lb_table.resizeColumnsToContents()
 
     def _refresh_answer_column(self):
         """Update only the Answer column for the current rows by matching name.

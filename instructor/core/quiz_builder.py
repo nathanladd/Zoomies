@@ -85,8 +85,8 @@ class QuizBuilder(QWidget):
         self.quiz_table.setHorizontalHeaderLabels(["ID", "Name", "Questions"])
         _hdr = self.quiz_table.horizontalHeader()
         for _i in range(3):
-            _hdr.setSectionResizeMode(_i, QHeaderView.ResizeMode.ResizeToContents)
-        _hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            _hdr.setSectionResizeMode(_i, QHeaderView.ResizeMode.Interactive)
+        _hdr.setStretchLastSection(False)
         self.quiz_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.quiz_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.quiz_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -122,8 +122,8 @@ class QuizBuilder(QWidget):
         self.q_table.setHorizontalHeaderLabels(["#", "Q-ID", "Type", "Text", "Time"])
         _hdr = self.q_table.horizontalHeader()
         for _i in range(5):
-            _hdr.setSectionResizeMode(_i, QHeaderView.ResizeMode.ResizeToContents)
-        _hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+            _hdr.setSectionResizeMode(_i, QHeaderView.ResizeMode.Interactive)
+        _hdr.setStretchLastSection(False)
         self.q_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.q_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.q_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -148,6 +148,7 @@ class QuizBuilder(QWidget):
             self.quiz_table.setItem(row, 0, QTableWidgetItem(str(qz["id"])))
             self.quiz_table.setItem(row, 1, QTableWidgetItem(qz["name"]))
             self.quiz_table.setItem(row, 2, QTableWidgetItem(str(qz.get("question_count", 0))))
+        self.quiz_table.resizeColumnsToContents()
 
     def _on_quiz_selected(self, row, col, prev_row, prev_col):
         if row < 0:
@@ -175,6 +176,7 @@ class QuizBuilder(QWidget):
             text = (q.get("text") or "")[:60]
             self.q_table.setItem(row, 3, QTableWidgetItem(text))
             self.q_table.setItem(row, 4, QTableWidgetItem(f"{q.get('time_seconds', 10)}s"))
+        self.q_table.resizeColumnsToContents()
 
     def _on_question_double_clicked(self):
         row = self.q_table.currentRow()
@@ -341,8 +343,8 @@ class AddQuestionDialog(QDialog):
         self.table.setHorizontalHeaderLabels(["ID", "Type", "Text", "Topic"])
         _hdr = self.table.horizontalHeader()
         for _i in range(4):
-            _hdr.setSectionResizeMode(_i, QHeaderView.ResizeMode.ResizeToContents)
-        _hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+            _hdr.setSectionResizeMode(_i, QHeaderView.ResizeMode.Interactive)
+        _hdr.setStretchLastSection(False)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -379,6 +381,7 @@ class AddQuestionDialog(QDialog):
             self.table.setItem(row, 1, QTableWidgetItem(q["question_type"]))
             self.table.setItem(row, 2, QTableWidgetItem((q.get("text") or "")[:60]))
             self.table.setItem(row, 3, QTableWidgetItem(q.get("topic_name") or "-"))
+        self.table.resizeColumnsToContents()
 
     def _selected_question_id(self) -> int | None:
         row = self.table.currentRow()

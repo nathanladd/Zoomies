@@ -719,8 +719,8 @@ class QuestionPool(QWidget):
         self.table.setHorizontalHeaderLabels(["ID", "Type", "Text", "Correct", "Topic", "Time", "Image"])
         _hdr = self.table.horizontalHeader()
         for _i in range(7):
-            _hdr.setSectionResizeMode(_i, QHeaderView.ResizeMode.ResizeToContents)
-        _hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+            _hdr.setSectionResizeMode(_i, QHeaderView.ResizeMode.Interactive)
+        _hdr.setStretchLastSection(False)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -791,6 +791,7 @@ class QuestionPool(QWidget):
             self.table.setItem(row, 4, QTableWidgetItem(q.get("topic_name") or "-"))
             self.table.setItem(row, 5, QTableWidgetItem(f"{q['time_seconds']}s"))
             self.table.setItem(row, 6, QTableWidgetItem(q.get("image_filename") or ""))
+        self.table.resizeColumnsToContents()
 
     def _selected_question_id(self) -> int | None:
         row = self.table.currentRow()
