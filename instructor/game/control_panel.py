@@ -156,6 +156,7 @@ class GameControlPanel(QWidget):
     _stats_loaded = pyqtSignal(int, dict)
     _version_loaded = pyqtSignal(str, str)  # (label_text, stylesheet)
     _image_loaded = pyqtSignal(str, object)  # (image_url key, raw bytes or None)
+    _status_polled = pyqtSignal(int)  # active_games count
 
     def __init__(self, api: ApiClient, server_host: str = "localhost", server_port: int = 5000):
         super().__init__()
@@ -179,8 +180,14 @@ class GameControlPanel(QWidget):
         self._stats_loaded.connect(self._on_stats_loaded)
         self._version_loaded.connect(self._on_version_loaded)
         self._image_loaded.connect(self._on_image_loaded)
+        self._status_polled.connect(self._on_status_polled)
         self._connect_log_ws()
         self._refresh_quizzes()
+        QTimer.singleShot(1000, self._poll_active_games)
+        self._poll_timer = QTimer(self)
+        self._poll_timer.setInterval(10_000)
+        self._poll_timer.timeout.connect(self._poll_active_games)
+        self._poll_timer.start()
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -242,8 +249,12 @@ class GameControlPanel(QWidget):
         self.status_label.setStyleSheet("font-size: 14px;")
         self.game_label = QLabel("No active game")
         self.game_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        self.active_games_label = QLabel("Active games: —")
+        self.active_games_label.setStyleSheet("font-size: 13px; color: #888888;")
         status_row.addWidget(self.status_label)
         status_row.addStretch()
+        status_row.addWidget(self.active_games_label)
+        status_row.addSpacing(16)
         status_row.addWidget(self.game_label)
         controls_layout.addLayout(status_row)
 
@@ -922,6 +933,28 @@ class GameControlPanel(QWidget):
     def _on_version_loaded(self, text: str, style: str) -> None:
         self.server_version_label.setText(text)
         self.server_version_label.setStyleSheet(style)
+
+    # ── Active games poll ──────────────────────────────────────────────────────
+
+    def _poll_active_games(self) -> None:
+        http_scheme = "https" if self.server_port == 443 else "http"
+        url = f"{http_scheme}://{self.server_host}:{self.server_port}/api/status"
+
+        def _worker() -> None:
+            try:
+                import httpx
+                r = httpx.get(url, timeout=1.0)
+                if r.status_code == 200:
+                    self._status_polled.emit(r.json().get("active_games", 0))
+            except Exception:
+                pass
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_status_polled(self, count: int) -> None:
+        self.active_games_label.setText(f"Active games: {count}")
+        style = "font-size: 13px; color: #2E7D32;" if count > 0 else "font-size: 13px; color: #888888;"
+        self.active_games_label.setStyleSheet(style)
 
     def closeEvent(self, event):
         if self._log_ws:

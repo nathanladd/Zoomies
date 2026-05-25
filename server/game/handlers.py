@@ -409,6 +409,8 @@ async def handle_instructor_ws(ws: WebSocket, game_id: int) -> None:
         if timer_task and not timer_task.done():
             timer_task.cancel()
         manager.disconnect_instructor(game_id)
+        if game_id in active_games:
+            _evict_game(game_id)
 
 
 async def _question_timer_loop(game_id: int, engine: GameEngine) -> None:
