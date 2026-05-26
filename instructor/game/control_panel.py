@@ -183,10 +183,10 @@ class GameControlPanel(QWidget):
         self._status_polled.connect(self._on_status_polled)
         self._connect_log_ws()
         self._refresh_quizzes()
-        QTimer.singleShot(1000, self._poll_active_games)
+        QTimer.singleShot(1000, self._poll_server_status)
         self._poll_timer = QTimer(self)
-        self._poll_timer.setInterval(10_000)
-        self._poll_timer.timeout.connect(self._poll_active_games)
+        self._poll_timer.setInterval(60_000)
+        self._poll_timer.timeout.connect(self._poll_server_status)
         self._poll_timer.start()
 
     def _build_ui(self):
@@ -356,7 +356,6 @@ class GameControlPanel(QWidget):
         self.server_version_label.setToolTip("Version reported by GET /api/version")
         srv_toolbar.addWidget(self.server_version_label)
         srv_layout.addLayout(srv_toolbar)
-        QTimer.singleShot(800, self._refresh_server_version)
         self.server_console = QPlainTextEdit()
         self.server_console.setReadOnly(True)
         self.server_console.setMaximumBlockCount(500)
@@ -632,6 +631,7 @@ class GameControlPanel(QWidget):
     def _start_game(self):
         if self.ws_thread:
             self.ws_thread.send({"type": "start_game"})
+            QTimer.singleShot(1000, self._poll_server_status)
 
     def _next_question(self):
         if self.ws_thread:
@@ -648,6 +648,7 @@ class GameControlPanel(QWidget):
         )
         if reply == QMessageBox.StandardButton.Yes and self.ws_thread:
             self.ws_thread.send({"type": "end_game"})
+            QTimer.singleShot(1000, self._poll_server_status)
 
     def toggle_projection(self) -> bool:
         """Show/hide the projection window. Returns new visible state.
@@ -933,7 +934,11 @@ class GameControlPanel(QWidget):
         self.server_version_label.setText(text)
         self.server_version_label.setStyleSheet(style)
 
-    # ── Active games poll ──────────────────────────────────────────────────────
+    # ── Server status poll ─────────────────────────────────────────────────────
+
+    def _poll_server_status(self) -> None:
+        self._poll_active_games()
+        self._refresh_server_version()
 
     def _poll_active_games(self) -> None:
         http_scheme = "https" if self.server_port == 443 else "http"
