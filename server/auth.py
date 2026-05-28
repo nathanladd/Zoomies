@@ -19,10 +19,10 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from server.config import USER_DATA_DIR
+from server.config import DATA_DIR
 
-_CREDENTIALS_FILE = USER_DATA_DIR / "credentials.json"
-_SECRET_FILE = USER_DATA_DIR / "jwt_secret.txt"
+_CREDENTIALS_FILE = DATA_DIR / "credentials.json"
+_SECRET_FILE = DATA_DIR / "jwt_secret.txt"
 _DEFAULT_USERNAME = "instructor"
 _DEFAULT_PASSWORD = "rudi"
 _TOKEN_HOURS = 24

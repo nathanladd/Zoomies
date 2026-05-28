@@ -31,7 +31,7 @@ else:
     BASE_DIR = Path(__file__).resolve().parent.parent
     USER_DATA_DIR = BASE_DIR
 
-DATA_DIR = USER_DATA_DIR / "data"
+DATA_DIR = USER_DATA_DIR / "database"
 MEDIA_DIR = USER_DATA_DIR / "media" / "questions"
 BACKUPS_DIR = USER_DATA_DIR / "backups"
 

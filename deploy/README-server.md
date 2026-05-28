@@ -20,8 +20,8 @@ sudo chown -R rudi:rudi /opt/rudi
 # 3. Create a virtual environment and install dependencies
 sudo -u rudi bash -c 'cd /opt/rudi && python3 -m venv venv && venv/bin/pip install -r requirements-server.txt'
 
-# 4. Create data directory
-sudo -u rudi mkdir -p /opt/rudi/data
+# 4. Create data directories
+sudo -u rudi mkdir -p /opt/rudi/data/database /opt/rudi/data/backups
 
 # 5. Install the systemd service
 sudo cp deploy/rudi-server.service /etc/systemd/system/
@@ -51,10 +51,10 @@ sudo journalctl -u rudi-server -f
 
 ## Backups
 
-The database lives at `$RUDI_DATA_DIR/data/rudi.db`. Back it up with a cron job or manual copy:
+The database lives at `$RUDI_DATA_DIR/database/rudi.db`. Back it up with a cron job or manual copy:
 
 ```bash
-cp /opt/rudi/data/data/rudi.db /backups/rudi-$(date +%Y%m%d).db
+cp /opt/rudi/data/database/rudi.db /opt/rudi/data/backups/rudi-$(date +%Y%m%d).db
 ```
 
 Media files are under `$RUDI_DATA_DIR/media/questions/`.
