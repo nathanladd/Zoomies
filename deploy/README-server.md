@@ -54,7 +54,7 @@ sudo journalctl -u rudi-server -f
 The database lives at `$RUDI_DATA_DIR/database/rudi.db`. Back it up with a cron job or manual copy:
 
 ```bash
-cp /opt/rudi/data/database/rudi.db /opt/rudi/data/backups/rudi-$(date +%Y%m%d).db
+cp $RUDI_DATA_DIR/database/rudi.db $RUDI_DATA_DIR/backups/rudi-$(date +%Y%m%d).db
 ```
 
 Media files are under `$RUDI_DATA_DIR/media/questions/`.

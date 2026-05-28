@@ -5,4 +5,4 @@ SERVER_VERSION  — server (returned by GET /api/version, shown in student UI)
 """
 
 __version__ = "2.1"
-SERVER_VERSION = "2.2"
+SERVER_VERSION = "2.3"
