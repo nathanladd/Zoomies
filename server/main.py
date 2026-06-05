@@ -7,10 +7,11 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.auth import require_auth, verify_ws_token
-from server.config import BASE_DIR, MEDIA_DIR, USER_DATA_DIR
+from server.config import BASE_DIR, MEDIA_DIR, RELEASES_DIR, USER_DATA_DIR
 from server.database import init_db, get_db
 from server.routers import topics, questions, quizzes, games, settings
 from server.routers import auth as auth_router
+from server.routers import app_release
 from server.game.handlers import (
     load_engine, handle_student_ws, handle_instructor_ws,
     join_codes, active_games,
@@ -41,6 +42,7 @@ app = FastAPI(title="Rudi", version=SERVER_VERSION, lifespan=lifespan)
 # ensured to exist by server.config.
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 app.mount("/media", StaticFiles(directory=str(USER_DATA_DIR / "media")), name="media")
+app.mount("/releases", StaticFiles(directory=str(RELEASES_DIR)), name="releases")
 
 # Register API routers
 app.include_router(auth_router.router)
@@ -49,6 +51,7 @@ app.include_router(questions.router)
 app.include_router(quizzes.router)
 app.include_router(games.router)
 app.include_router(settings.router)
+app.include_router(app_release.router)
 
 
 # ── Meta ──────────────────────────────────────────────────────────────────────────

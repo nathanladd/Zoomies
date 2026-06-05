@@ -1,7 +1,7 @@
 import sys
 
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QDockWidget, QWidget, QStatusBar,
+    QApplication, QMainWindow, QDockWidget, QWidget, QStatusBar, QMessageBox,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
@@ -56,8 +56,10 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._build_menu()
         self.statusBar().showMessage(f"Connected to server at {api.base_url}")
+        self._update_checkers: list = []  # keep refs alive until threads finish
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self._apply_default_view)
+        QTimer.singleShot(4000, self._auto_check_updates)
 
     def _build_ui(self):
         # Tabs for content management
@@ -164,6 +166,10 @@ class MainWindow(QMainWindow):
         settings_action.triggered.connect(self._open_settings)
         file_menu.addAction(settings_action)
 
+        check_update_action = QAction("Check for &Updates\u2026", self)
+        check_update_action.triggered.connect(self._check_for_updates)
+        file_menu.addAction(check_update_action)
+
         file_menu.addSeparator()
 
         quit_action = QAction("&Quit", self)
@@ -224,6 +230,60 @@ class MainWindow(QMainWindow):
         self.dock_questions.show()
         self.dock_questions.raise_()
         self.question_pool.edit_question_by_id(question_id)
+
+    # ── Update checker ────────────────────────────────────────────────────────
+
+    def _auto_check_updates(self) -> None:
+        from instructor.app_settings import load as load_settings
+        settings = load_settings()
+        if not settings.get("auto_check_updates", True):
+            return
+        self._run_update_check(
+            silent_if_current=True,
+            skipped_version=settings.get("skipped_version"),
+        )
+
+    def _check_for_updates(self) -> None:
+        from instructor.app_settings import load as load_settings
+        settings = load_settings()
+        self._run_update_check(
+            silent_if_current=False,
+            skipped_version=settings.get("skipped_version"),
+        )
+
+    def _run_update_check(self, *, silent_if_current: bool, skipped_version: str | None) -> None:
+        from instructor.update_checker import UpdateChecker
+        checker = UpdateChecker(self.api.base_url)
+        self._update_checkers.append(checker)
+
+        def _cleanup() -> None:
+            try:
+                self._update_checkers.remove(checker)
+            except ValueError:
+                pass
+            checker.deleteLater()
+
+        checker.update_available.connect(
+            lambda ver, notes, url, sha:
+                self._on_update_available(ver, notes, url, sha, skipped_version)
+        )
+        if not silent_if_current:
+            checker.up_to_date.connect(
+                lambda: QMessageBox.information(
+                    self, "No Updates", f"Rudi v{__version__} is up to date."
+                )
+            )
+        checker.finished.connect(_cleanup)
+        checker.start()
+
+    def _on_update_available(
+        self, ver: str, notes: str, url: str, sha: str, skipped_version: str | None
+    ) -> None:
+        if skipped_version == ver:
+            return
+        from instructor.ui.update_dialog import UpdateDialog
+        dlg = UpdateDialog(ver, notes, url, sha, parent=self)
+        dlg.exec()
 
     def closeEvent(self, event):
         # ProjectionWindow is a parentless top-level window, so closing the

@@ -34,6 +34,7 @@ else:
 DATA_DIR = USER_DATA_DIR / "database"
 MEDIA_DIR = USER_DATA_DIR / "media" / "questions"
 BACKUPS_DIR = USER_DATA_DIR / "backups"
+RELEASES_DIR = USER_DATA_DIR / "releases"
 
 DB_FILENAME = "rudi.db"
 DB_PATH = DATA_DIR / DB_FILENAME
@@ -55,6 +56,7 @@ DATABASE_URL = f"sqlite+aiosqlite:///{DB_PATH}"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+RELEASES_DIR.mkdir(parents=True, exist_ok=True)
 
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 5000

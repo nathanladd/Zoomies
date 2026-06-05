@@ -23,3 +23,6 @@ aiofiles>=23.2
 
 # Image Processing (optional)
 Pillow>=10.2
+
+# Version comparison (update checker)
+packaging>=23.0

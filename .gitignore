@@ -39,8 +39,11 @@ build/
 *.log
 *.err
 
-# Secrets
+# Secrets and local runtime files
 jwt_secret.txt
+credentials.json
+connection.json
+database/
 
 # OS
 Thumbs.db
