@@ -4,5 +4,5 @@ __version__     — instructor desktop app (Windows installer, title bar)
 SERVER_VERSION  — server (returned by GET /api/version, shown in student UI)
 """
 
-__version__ = "2.5"
+__version__ = "2.6"
 SERVER_VERSION = "2.4"
