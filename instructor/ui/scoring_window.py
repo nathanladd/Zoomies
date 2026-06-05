@@ -14,8 +14,9 @@ import math
 from PyQt6.QtCore import Qt, QPointF, QRectF
 from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPainterPath, QPen, QPolygonF
 from PyQt6.QtWidgets import (
-    QDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
-    QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
+    QDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView, QLabel,
+    QLineEdit, QMessageBox, QPushButton, QSpinBox, QTableWidget,
+    QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from instructor.connection_settings import load as load_connection, save as save_connection
@@ -398,57 +399,369 @@ class ScoringPanel(QWidget):
 
 
 class ConnectionPanel(QWidget):
-    """Panel for configuring the remote server host and port."""
+    """Server connection settings and account password management."""
 
     def __init__(self, api, parent: QWidget | None = None):
         super().__init__(parent)
         self.api = api
         settings = load_connection()
 
-        form = QFormLayout()
+        # ── Server Connection ────────────────────────────────────────────
+        server_box = QGroupBox("Server Connection")
+        server_form = QFormLayout(server_box)
         self.host_edit = QLineEdit(settings["server_host"])
         self.host_edit.setPlaceholderText("e.g. 192.168.1.50 or rudi.local")
         self.port_spin = QSpinBox()
         self.port_spin.setRange(1, 65535)
         self.port_spin.setValue(settings["server_port"])
-        form.addRow("Server Host:", self.host_edit)
-        form.addRow("Server Port:", self.port_spin)
+        server_form.addRow("Server Host:", self.host_edit)
+        server_form.addRow("Server Port:", self.port_spin)
 
-        self.save_btn = QPushButton("Save && Reconnect")
-        self.save_btn.clicked.connect(self._save)
-        self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #94a3b8; font-size: 12px;")
-
-        layout = QVBoxLayout(self)
-        layout.addLayout(form)
+        self.save_server_btn = QPushButton("Save && Reconnect")
+        self.save_server_btn.clicked.connect(self._save_server)
+        self.server_status = QLabel("")
+        self.server_status.setStyleSheet("color: #94a3b8; font-size: 12px;")
         btn_row = QHBoxLayout()
-        btn_row.addWidget(self.save_btn)
-        btn_row.addWidget(self.status_label)
+        btn_row.addWidget(self.save_server_btn)
+        btn_row.addWidget(self.server_status)
         btn_row.addStretch()
-        layout.addLayout(btn_row)
-        layout.addStretch()
+        server_form.addRow("", btn_row)
 
-    def _save(self):
+        # ── Account ───────────────────────────────────────────────────────
+        account_box = QGroupBox("Account")
+        account_form = QFormLayout(account_box)
+
+        username_label = QLabel(api.username or settings.get("username", ""))
+        username_label.setStyleSheet("font-weight: bold; padding: 2px 0;")
+        account_form.addRow("Username:", username_label)
+
+        self.current_pass_edit = QLineEdit()
+        self.current_pass_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.current_pass_edit.setPlaceholderText("Current password")
+        self.new_pass_edit = QLineEdit()
+        self.new_pass_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.new_pass_edit.setPlaceholderText("New password (min 4 characters)")
+        account_form.addRow("Current Password:", self.current_pass_edit)
+        account_form.addRow("New Password:", self.new_pass_edit)
+
+        self.change_pass_btn = QPushButton("Change Password")
+        self.change_pass_btn.clicked.connect(self._change_password)
+        self.pass_status = QLabel("")
+        self.pass_status.setStyleSheet("color: #94a3b8; font-size: 12px;")
+        pass_btn_row = QHBoxLayout()
+        pass_btn_row.addWidget(self.change_pass_btn)
+        pass_btn_row.addWidget(self.pass_status)
+        pass_btn_row.addStretch()
+        account_form.addRow("", pass_btn_row)
+
+        root = QVBoxLayout(self)
+        root.addWidget(server_box)
+        root.addWidget(account_box)
+        root.addStretch()
+
+    def _save_server(self):
         host = self.host_edit.text().strip()
         port = self.port_spin.value()
         if not host:
             QMessageBox.warning(self, "Validation", "Server host cannot be empty.")
             return
         save_connection(host, port)
-        # Update the live ApiClient base URL
         new_url = f"http://{host}:{port}"
         self.api.base_url = new_url
-        self.api.client = self.api._make_client(new_url)
-        self.status_label.setText(f"Saved. Now connecting to {new_url}")
-        self.status_label.setStyleSheet("color: #34d399; font-size: 12px;")
+        self.api.client = self.api._make_client(new_url, self.api.token)
+        self.server_status.setText(f"Saved. Now connecting to {new_url}")
+        self.server_status.setStyleSheet("color: #34d399; font-size: 12px;")
+
+    def _change_password(self):
+        current = self.current_pass_edit.text()
+        new = self.new_pass_edit.text()
+        if not current or not new:
+            self.pass_status.setText("Both fields are required.")
+            self.pass_status.setStyleSheet("color: #E53935; font-size: 12px;")
+            return
+        try:
+            self.api.change_password(current, new)
+        except Exception as e:
+            self.pass_status.setText(str(e))
+            self.pass_status.setStyleSheet("color: #E53935; font-size: 12px;")
+            return
+        # Keep connection.json in sync so auto-login still works after restart.
+        try:
+            s = load_connection()
+            save_connection(s["server_host"], s["server_port"],
+                            username=self.api.username, password=new)
+        except Exception:
+            pass
+        self.current_pass_edit.clear()
+        self.new_pass_edit.clear()
+        self.pass_status.setText("Password changed.")
+        self.pass_status.setStyleSheet("color: #34d399; font-size: 12px;")
+
+
+class _AddUserDialog(QDialog):
+    """Small dialog for creating a new user."""
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setWindowTitle("Add User")
+        self.setMinimumWidth(320)
+
+        from PyQt6.QtWidgets import QComboBox, QDialogButtonBox
+        form = QFormLayout()
+        self.username_edit = QLineEdit()
+        self.username_edit.setPlaceholderText("Unique login name")
+        self.password_edit = QLineEdit()
+        self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.password_edit.setPlaceholderText("Temporary password")
+        self.role_combo = QComboBox()
+        self.role_combo.addItems(["instructor", "admin"])
+        form.addRow("Username:", self.username_edit)
+        form.addRow("Password:", self.password_edit)
+        form.addRow("Role:", self.role_combo)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self._on_accept)
+        buttons.rejected.connect(self.reject)
+
+        root = QVBoxLayout(self)
+        root.addLayout(form)
+        root.addWidget(buttons)
+
+    def _on_accept(self):
+        if not self.username_edit.text().strip():
+            QMessageBox.warning(self, "Validation", "Username cannot be empty.")
+            return
+        if len(self.password_edit.text()) < 4:
+            QMessageBox.warning(self, "Validation", "Password must be at least 4 characters.")
+            return
+        self.accept()
+
+    @property
+    def username(self) -> str:
+        return self.username_edit.text().strip()
+
+    @property
+    def password(self) -> str:
+        return self.password_edit.text()
+
+    @property
+    def role(self) -> str:
+        return self.role_combo.currentText()
+
+
+class _ResetPasswordDialog(QDialog):
+    """Small dialog for resetting another user's password."""
+
+    def __init__(self, username: str, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Reset Password — {username}")
+        self.setMinimumWidth(300)
+
+        from PyQt6.QtWidgets import QDialogButtonBox
+        form = QFormLayout()
+        self.password_edit = QLineEdit()
+        self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.password_edit.setPlaceholderText("New temporary password")
+        form.addRow("New Password:", self.password_edit)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self._on_accept)
+        buttons.rejected.connect(self.reject)
+
+        root = QVBoxLayout(self)
+        root.addLayout(form)
+        root.addWidget(buttons)
+
+    def _on_accept(self):
+        if len(self.password_edit.text()) < 4:
+            QMessageBox.warning(self, "Validation", "Password must be at least 4 characters.")
+            return
+        self.accept()
+
+    @property
+    def password(self) -> str:
+        return self.password_edit.text()
+
+
+class ManageUsersPanel(QWidget):
+    """Admin-only panel for listing, adding, toggling, and deleting users."""
+
+    _COL_USERNAME = 0
+    _COL_ROLE = 1
+    _COL_STATUS = 2
+    _COL_CREATED = 3
+    _COL_ACTIONS = 4
+
+    def __init__(self, api, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.api = api
+
+        top_row = QHBoxLayout()
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.clicked.connect(self._load)
+        self.add_btn = QPushButton("Add User")
+        self.add_btn.clicked.connect(self._add_user)
+        top_row.addWidget(refresh_btn)
+        top_row.addStretch()
+        top_row.addWidget(self.add_btn)
+
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(
+            ["Username", "Role", "Status", "Created", "Actions"]
+        )
+        self.table.horizontalHeader().setSectionResizeMode(
+            self._COL_USERNAME, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.table.horizontalHeader().setSectionResizeMode(
+            self._COL_ROLE, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.table.horizontalHeader().setSectionResizeMode(
+            self._COL_STATUS, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.table.horizontalHeader().setSectionResizeMode(
+            self._COL_CREATED, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.table.horizontalHeader().setSectionResizeMode(
+            self._COL_ACTIONS, QHeaderView.ResizeMode.Stretch
+        )
+        self.table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.verticalHeader().hide()
+
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet("color: #94a3b8; font-size: 12px;")
+
+        root = QVBoxLayout(self)
+        root.addLayout(top_row)
+        root.addWidget(self.table, 1)
+        root.addWidget(self.status_label)
+
+        self._load()
+
+    def _load(self):
+        try:
+            users = self.api.list_users()
+        except Exception as e:
+            self.status_label.setText(f"Failed to load users: {e}")
+            self.status_label.setStyleSheet("color: #E53935; font-size: 12px;")
+            return
+        self._populate(users)
+        self.status_label.setText("")
+
+    def _populate(self, users: list[dict]):
+        self.table.setRowCount(len(users))
+        for row, user in enumerate(users):
+            username = user["username"]
+            is_active = user.get("active", True)
+
+            self.table.setItem(row, self._COL_USERNAME, QTableWidgetItem(username))
+            self.table.setItem(row, self._COL_ROLE, QTableWidgetItem(user.get("role", "")))
+            self.table.setItem(row, self._COL_STATUS,
+                               QTableWidgetItem("Active" if is_active else "Disabled"))
+            created = user.get("created_at", "")[:10]
+            self.table.setItem(row, self._COL_CREATED, QTableWidgetItem(created))
+
+            cell = QWidget()
+            cell_layout = QHBoxLayout(cell)
+            cell_layout.setContentsMargins(4, 2, 4, 2)
+            cell_layout.setSpacing(6)
+
+            toggle_btn = QPushButton("Disable" if is_active else "Enable")
+            toggle_btn.setFixedWidth(64)
+            toggle_btn.clicked.connect(
+                lambda _, u=username, a=is_active: self._toggle_active(u, not a)
+            )
+
+            reset_btn = QPushButton("Reset PW")
+            reset_btn.setFixedWidth(72)
+            reset_btn.clicked.connect(lambda _, u=username: self._reset_password(u))
+
+            del_btn = QPushButton("Delete")
+            del_btn.setFixedWidth(56)
+            del_btn.setStyleSheet("color: #C62828;")
+            del_btn.clicked.connect(lambda _, u=username: self._delete_user(u))
+
+            cell_layout.addWidget(toggle_btn)
+            cell_layout.addWidget(reset_btn)
+            cell_layout.addWidget(del_btn)
+            cell_layout.addStretch()
+            self.table.setCellWidget(row, self._COL_ACTIONS, cell)
+
+        self.table.resizeRowsToContents()
+
+    def _set_status(self, msg: str, ok: bool = True):
+        color = "#34d399" if ok else "#E53935"
+        self.status_label.setText(msg)
+        self.status_label.setStyleSheet(f"color: {color}; font-size: 12px;")
+
+    def _add_user(self):
+        dlg = _AddUserDialog(self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            self.api.create_user(dlg.username, dlg.password, dlg.role)
+        except Exception as e:
+            self._set_status(str(e), ok=False)
+            return
+        self._set_status(f"User '{dlg.username}' created.")
+        self._load()
+
+    def _toggle_active(self, username: str, active: bool):
+        action = "enable" if active else "disable"
+        reply = QMessageBox.question(
+            self, "Confirm",
+            f"{'Enable' if active else 'Disable'} user '{username}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.api.patch_user(username, active=active)
+        except Exception as e:
+            self._set_status(str(e), ok=False)
+            return
+        self._set_status(f"User '{username}' {'enabled' if active else 'disabled'}.")
+        self._load()
+
+    def _reset_password(self, username: str):
+        dlg = _ResetPasswordDialog(username, self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            self.api.reset_user_password(username, dlg.password)
+        except Exception as e:
+            self._set_status(str(e), ok=False)
+            return
+        self._set_status(f"Password reset for '{username}'.")
+
+    def _delete_user(self, username: str):
+        reply = QMessageBox.question(
+            self, "Confirm Delete",
+            f"Permanently delete user '{username}'? This cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.api.delete_user(username)
+        except Exception as e:
+            self._set_status(str(e), ok=False)
+            return
+        self._set_status(f"User '{username}' deleted.")
+        self._load()
 
 
 class SettingsWindow(QDialog):
-    """Tabbed settings dialog: Topics + Scoring + Connection."""
+    """Tabbed settings dialog: Topics + Scoring + Connection [+ Manage Users (admin)]."""
 
     TAB_TOPICS = 0
     TAB_SCORING = 1
     TAB_CONNECTION = 2
+    TAB_MANAGE_USERS = 3
 
     def __init__(self, api, parent: QWidget | None = None, initial_tab: int = 0):
         super().__init__(parent)
@@ -463,6 +776,11 @@ class SettingsWindow(QDialog):
         self.tabs.addTab(self.topic_manager, "Topics")
         self.tabs.addTab(self.scoring_panel, "Scoring")
         self.tabs.addTab(self.connection_panel, "Connection")
+
+        if getattr(api, "role", "") == "admin":
+            self.manage_users_panel = ManageUsersPanel(api)
+            self.tabs.addTab(self.manage_users_panel, "Manage Users")
+
         self.tabs.setCurrentIndex(initial_tab)
 
         close_btn = QPushButton("Close")

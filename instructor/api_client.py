@@ -22,6 +22,8 @@ class ApiClient:
     def __init__(self, base_url: str = "http://localhost:5000", token: str | None = None):
         self.base_url = base_url
         self.token: str | None = token
+        self.role: str = "instructor"
+        self.username: str = ""
         self.client = self._make_client(base_url, token)
 
     @staticmethod
@@ -45,7 +47,10 @@ class ApiClient:
             timeout=10.0,
         )
         _raise_for_status(resp)
-        token = resp.json()["token"]
+        data = resp.json()
+        token = data["token"]
+        self.role = data.get("role", "instructor")
+        self.username = data.get("username", username)
         self.set_token(token)
         return token
 
@@ -234,6 +239,45 @@ class ApiClient:
         resp = self.client.get("/api/settings/scoring")
         _raise_for_status(resp)
         return resp.json()
+
+    # ── Account ────────────────────────────────────────────────────────────
+
+    def change_password(self, current_password: str, new_password: str) -> None:
+        resp = self.client.post("/api/auth/change-password", json={
+            "current_password": current_password,
+            "new_password": new_password,
+        })
+        _raise_for_status(resp)
+
+    # ── User management (admin only) ───────────────────────────────────────
+
+    def list_users(self) -> list[dict[str, Any]]:
+        resp = self.client.get("/api/auth/users")
+        _raise_for_status(resp)
+        return resp.json()
+
+    def create_user(self, username: str, password: str, role: str = "instructor") -> dict[str, Any]:
+        resp = self.client.post("/api/auth/users", json={
+            "username": username, "password": password, "role": role,
+        })
+        _raise_for_status(resp)
+        return resp.json()
+
+    def patch_user(self, username: str, **kwargs: Any) -> dict[str, Any]:
+        resp = self.client.patch(f"/api/auth/users/{username}", json=kwargs)
+        _raise_for_status(resp)
+        return resp.json()
+
+    def reset_user_password(self, username: str, new_password: str) -> None:
+        resp = self.client.post(
+            f"/api/auth/users/{username}/reset-password",
+            json={"new_password": new_password},
+        )
+        _raise_for_status(resp)
+
+    def delete_user(self, username: str) -> None:
+        resp = self.client.delete(f"/api/auth/users/{username}")
+        _raise_for_status(resp)
 
     def set_scoring(self, points: list[dict[str, Any]]) -> dict[str, Any]:
         resp = self.client.put(
