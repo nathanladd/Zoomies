@@ -903,11 +903,7 @@ class GameControlPanel(QWidget):
         self._log_ws.status_changed.connect(self._append_server_log)
         self._log_ws.start()
 
-    _SUPPRESS_LOG_PATTERNS = ("/api/status ", "/api/version ")
-
     def _append_server_log(self, line: str):
-        if any(p in line for p in self._SUPPRESS_LOG_PATTERNS):
-            return
         self.server_console.appendPlainText(line)
         sb = self.server_console.verticalScrollBar()
         sb.setValue(sb.maximum())

@@ -36,6 +36,7 @@ class LogBroadcaster:
             logger = logging.getLogger(name)
             logger.addHandler(handler)
             logger.propagate = False
+        logging.getLogger("uvicorn.access").addFilter(_SuppressPollingFilter())
 
     # ── client management ────────────────────────────────────────────────
 
@@ -95,6 +96,14 @@ class _CapturingStream(io.TextIOBase):
     @property
     def encoding(self) -> str:
         return getattr(self._original, "encoding", "utf-8")
+
+
+class _SuppressPollingFilter(logging.Filter):
+    _PATHS = {"/api/status", "/api/version"}
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        return not (isinstance(args, tuple) and len(args) >= 3 and args[2] in self._PATHS)
 
 
 class _BroadcastLogHandler(logging.Handler):
