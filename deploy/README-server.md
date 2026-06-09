@@ -1,4 +1,4 @@
-# Rudi Server — Ubuntu Deployment
+# Zoomies Server — Ubuntu Deployment
 
 ## Prerequisites
 
@@ -10,24 +10,25 @@
 
 ```bash
 # 1. Create a service user (optional)
-sudo useradd -r -s /usr/sbin/nologin -m -d /opt/rudi rudi
+sudo useradd -r -s /usr/sbin/nologin -m -d /home/rudi rudi
 
-# 2. Copy server files to /opt/rudi
-sudo mkdir -p /opt/rudi
-sudo cp -r server/ static/ run_server.py version.py requirements-server.txt /opt/rudi/
-sudo chown -R rudi:rudi /opt/rudi
+# 2. Copy server files to /opt/zoomies
+sudo mkdir -p /opt/zoomies
+sudo cp -r server/ static/ run_server.py version.py requirements-server.txt /opt/zoomies/
+sudo chown -R rudi:rudi /opt/zoomies
 
 # 3. Create a virtual environment and install dependencies
-sudo -u rudi bash -c 'cd /opt/rudi && python3 -m venv venv && venv/bin/pip install -r requirements-server.txt'
+sudo -u rudi bash -c 'cd /opt/zoomies && python3 -m venv venv && venv/bin/pip install -r requirements-server.txt'
 
 # 4. Create data directories
-sudo -u rudi mkdir -p /opt/rudi/data/database /opt/rudi/data/backups
+sudo mkdir -p /var/opt/zoomies/database /var/opt/zoomies/media/questions /var/opt/zoomies/backups
+sudo chown -R rudi:rudi /var/opt/zoomies
 
 # 5. Install the systemd service
-sudo cp deploy/rudi-server.service /etc/systemd/system/
+sudo cp deploy/zoomies.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable rudi-server
-sudo systemctl start rudi-server
+sudo systemctl enable zoomies
+sudo systemctl start zoomies
 ```
 
 ## Firewall
@@ -40,21 +41,21 @@ sudo ufw allow 5000/tcp
 
 ## Configuration
 
-- **Port/host**: Edit `server/config.py` constants or set environment variables in the service file.
-- **Data directory**: Set `RUDI_DATA_DIR` in the service file's `Environment=` line.
+- **Port/host**: Edit the `SERVER_HOST`/`SERVER_PORT` constants in `server/config.py`.
+- **Data directory**: Variable data lives under `/var/opt/zoomies/` (database, media, backups), separate from the read-only app code in `/opt/zoomies/`. See `server/config.py`.
 
 ## Logs
 
 ```bash
-sudo journalctl -u rudi-server -f
+sudo journalctl -u zoomies -f
 ```
 
 ## Backups
 
-The database lives at `$RUDI_DATA_DIR/database/rudi.db`. Back it up with a cron job or manual copy:
+The database lives at `/var/opt/zoomies/database/zoomies.db`. Back it up with a cron job or manual copy:
 
 ```bash
-cp $RUDI_DATA_DIR/database/rudi.db $RUDI_DATA_DIR/backups/rudi-$(date +%Y%m%d).db
+cp /var/opt/zoomies/database/zoomies.db /var/opt/zoomies/backups/zoomies-$(date +%Y%m%d).db
 ```
 
-Media files are under `$RUDI_DATA_DIR/media/questions/`.
+Media files are under `/var/opt/zoomies/media/questions/`.

@@ -1,0 +1,13 @@
+[Unit]
+Description=Zoomies
+After=network.target
+
+[Service]
+User=rudi
+WorkingDirectory=/opt/zoomies
+ExecStart=/opt/zoomies/venv/bin/python run_server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

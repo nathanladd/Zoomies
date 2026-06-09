@@ -22,11 +22,11 @@ if IS_FROZEN:
         except OSError:
             pass
 elif sys.platform != "win32":
-    # Linux / macOS server deployment: honour RUDI_DATA_DIR env var or
-    # default to ~/.local/share/rudi for user-writable data.
+    # Linux server deployment: variable data (database, media, backups) lives
+    # under /var/opt/zoomies, separate from the read-only app code in /opt/zoomies
+    # — see the deploy runbook for the directory layout.
     BASE_DIR = Path(__file__).resolve().parent.parent
-    _env_data = os.environ.get("RUDI_DATA_DIR")
-    USER_DATA_DIR = Path(_env_data) if _env_data else Path.home() / ".local" / "share" / "rudi"
+    USER_DATA_DIR = Path("/var/opt/zoomies")
 else:
     BASE_DIR = Path(__file__).resolve().parent.parent
     USER_DATA_DIR = BASE_DIR
@@ -39,7 +39,7 @@ BACKUPS_DIR = USER_DATA_DIR / "backups"
 # RELEASES_DIR points at the repo checkout — git pull auto-deploys latest.json.
 RELEASES_DIR = USER_DATA_DIR / "releases" if IS_FROZEN else BASE_DIR / "releases"
 
-DB_FILENAME = "rudi.db"
+DB_FILENAME = "zoomies.db"
 DB_PATH = DATA_DIR / DB_FILENAME
 
 # One-time migration: rename the legacy zundpunkt.db file in place so existing

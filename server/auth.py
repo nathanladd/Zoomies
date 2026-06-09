@@ -22,9 +22,13 @@ from server.config import DATA_DIR
 
 _CREDENTIALS_FILE = DATA_DIR / "credentials.json"
 _SECRET_FILE = DATA_DIR / "jwt_secret.txt"
-_DEFAULT_USERNAME = "instructor"
-_DEFAULT_PASSWORD = "rudi"
 _TOKEN_HOURS = 24
+
+_DEFAULT_USERS = [
+    {"username": "Nate",   "password": "ruettiger",  "role": "admin"},
+    {"username": "George", "password": "slurry",     "role": "instructor"},
+    {"username": "Brian",  "password": "ubiquitous", "role": "instructor"},
+]
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -88,11 +92,11 @@ def _get_users() -> list[dict]:
                 return _users
         except Exception:
             pass
-    # First run — create default admin
-    _users = [_make_user(
-        _DEFAULT_USERNAME, hash_password(_DEFAULT_PASSWORD),
-        role="admin", active=True,
-    )]
+    # First run — seed default accounts
+    _users = [
+        _make_user(u["username"], hash_password(u["password"]), role=u["role"], active=True)
+        for u in _DEFAULT_USERS
+    ]
     _CREDENTIALS_FILE.parent.mkdir(parents=True, exist_ok=True)
     _persist()
     return _users
