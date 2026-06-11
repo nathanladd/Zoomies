@@ -68,6 +68,23 @@ class QuestionRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Note ───────────────────────────────────────────────────────────────────────
+
+class NoteUpsert(BaseModel):
+    discussion: str | None = None
+    citations: str | None = None
+
+class NoteRead(BaseModel):
+    id: int
+    question_id: int
+    discussion: str | None
+    citations: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # ── Quiz ───────────────────────────────────────────────────────────────────────
 
 class QuizCreate(BaseModel):

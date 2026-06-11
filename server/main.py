@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from server.auth import require_auth, verify_ws_token
 from server.config import BASE_DIR, MEDIA_DIR, RELEASES_DIR, USER_DATA_DIR
 from server.database import init_db, get_db
-from server.routers import topics, questions, quizzes, games, settings
+from server.routers import topics, questions, quizzes, games, settings, notes
 from server.routers import auth as auth_router
 from server.routers import app_release
 from server.game.handlers import (
@@ -51,6 +51,7 @@ app.include_router(questions.router)
 app.include_router(quizzes.router)
 app.include_router(games.router)
 app.include_router(settings.router)
+app.include_router(notes.router)
 app.include_router(app_release.router)
 
 

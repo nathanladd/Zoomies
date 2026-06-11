@@ -47,6 +47,10 @@ class Question(Base):
         back_populates="question", lazy="selectin",
         cascade="all, delete-orphan", passive_deletes=True,
     )
+    note: Mapped["Note | None"] = relationship(
+        back_populates="question", uselist=False, lazy="selectin",
+        cascade="all, delete-orphan", passive_deletes=True,
+    )
 
 
 class Quiz(Base):
@@ -104,6 +108,23 @@ class Player(Base):
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     game: Mapped[Game] = relationship(back_populates="players", lazy="selectin")
+
+
+class Note(Base):
+    """Optional discussion notes and citations for a single question (1:1 with Question)."""
+
+    __tablename__ = "notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    question_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False, unique=True,
+    )
+    discussion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    citations: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    question: Mapped["Question"] = relationship(back_populates="note")
 
 
 class QuestionAnswerStat(Base):

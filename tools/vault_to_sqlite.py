@@ -40,7 +40,7 @@ Question file format — questions separated by --- dividers:
     - C. Another wrong option
     - D. Yet another wrong option
 
-    > Source: Operator manual, p. 42.
+    > **Citations:** Operator manual, p. 42.
 
     ---
 
@@ -79,6 +79,9 @@ _CORRECT_SPAN = re.compile(
 )
 _ANSWER_LINE = re.compile(r'^\s*-\s+(?:[A-D]\.\s+)?(\S.+)$')
 _QUESTION_LINE = re.compile(r'^\*\*(.+?)\*\*\s*$')
+_DISCUSSION_HEADER = re.compile(r'^>\s*\*\*Discussion:\*\*\s*', re.IGNORECASE)
+_CITATIONS_HEADER = re.compile(r'^>\s*\*\*Citations:\*\*\s*', re.IGNORECASE)
+_BLOCKQUOTE_LINE = re.compile(r'^>\s?')
 
 
 def _parse_frontmatter(text: str) -> tuple[list[str], str]:
@@ -113,9 +116,32 @@ def _parse_block(block: str, tags: list[str]) -> tuple[dict | None, str | None]:
     question_text: str | None = None
     correct_answers: list[str] = []
     wrong_answers: list[str] = []
+    discussion: str | None = None
+    citations: str | None = None
+    _active_field: str | None = None  # 'discussion' | 'citations' | None
 
     for line in block.split('\n'):
         s = line.strip()
+
+        # Blockquote lines — check for Discussion/Citations headers
+        if s.startswith('>'):
+            if _DISCUSSION_HEADER.match(s):
+                discussion = _DISCUSSION_HEADER.sub('', s).strip() or None
+                _active_field = 'discussion'
+            elif _CITATIONS_HEADER.match(s):
+                citations = _CITATIONS_HEADER.sub('', s).strip() or None
+                _active_field = 'citations'
+            else:
+                # Continuation of the active blockquote field
+                continuation = _BLOCKQUOTE_LINE.sub('', s).strip()
+                if continuation and _active_field == 'discussion':
+                    discussion = ((discussion or '') + ' ' + continuation).strip()
+                elif continuation and _active_field == 'citations':
+                    citations = ((citations or '') + ' ' + continuation).strip()
+            continue
+
+        _active_field = None  # non-blockquote line ends continuation
+
         m = _CORRECT_SPAN.search(s)
         if m:
             correct_answers.append(_clean_answer(m.group(1)))
@@ -124,7 +150,7 @@ def _parse_block(block: str, tags: list[str]) -> tuple[dict | None, str | None]:
         if ma:
             wrong_answers.append(ma.group(1).strip())
             continue
-        if not s.startswith(('-', '>', '#')):
+        if not s.startswith(('-', '#')):
             mq = _QUESTION_LINE.match(s)
             if mq:
                 question_text = mq.group(1).strip()
@@ -145,6 +171,8 @@ def _parse_block(block: str, tags: list[str]) -> tuple[dict | None, str | None]:
         'wrong_answer_1': wrong_answers[0] if len(wrong_answers) > 0 else None,
         'wrong_answer_2': wrong_answers[1] if len(wrong_answers) > 1 else None,
         'wrong_answer_3': wrong_answers[2] if len(wrong_answers) > 2 else None,
+        'discussion': discussion,
+        'citations': citations,
     }, None
 
 
@@ -209,6 +237,10 @@ class RudiClient:
 
     def create_question(self, data: dict) -> dict:
         return self._request('POST', '/api/questions', data)
+
+    def upsert_note(self, question_id: int, discussion: str | None, citations: str | None) -> dict:
+        return self._request('PUT', f'/api/questions/{question_id}/note',
+                             {'discussion': discussion, 'citations': citations})
 
 
 # ---------------------------------------------------------------------------
@@ -295,10 +327,16 @@ def run_import(vault_dir: Path, client: RudiClient, dry_run: bool) -> None:
                 'correct_index': 0,
             }
             try:
-                client.create_question(payload)
+                created_q = client.create_question(payload)
                 existing_keys.add(key)
                 print(f'  + {preview}')
                 created += 1
+
+                if q.get('discussion') or q.get('citations'):
+                    try:
+                        client.upsert_note(created_q['id'], q.get('discussion'), q.get('citations'))
+                    except RuntimeError as exc:
+                        print(f'    ! note failed: {exc}')
             except RuntimeError as exc:
                 errors.append(f'{preview[:40]}: {exc}')
                 print(f'  X ERROR: {exc}')
