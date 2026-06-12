@@ -440,7 +440,7 @@ class ConnectionPanel(QWidget):
         self.current_pass_edit.setPlaceholderText("Current password")
         self.new_pass_edit = QLineEdit()
         self.new_pass_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.new_pass_edit.setPlaceholderText("New password (min 4 characters)")
+        self.new_pass_edit.setPlaceholderText("New password (min 8 characters)")
         account_form.addRow("Current Password:", self.current_pass_edit)
         account_form.addRow("New Password:", self.new_pass_edit)
 
@@ -532,7 +532,7 @@ class _AddUserDialog(QDialog):
             QMessageBox.warning(self, "Validation", "Username cannot be empty.")
             return
         if len(self.password_edit.text()) < 4:
-            QMessageBox.warning(self, "Validation", "Password must be at least 4 characters.")
+            QMessageBox.warning(self, "Validation", "Password must be at least 8 characters.")
             return
         self.accept()
 
@@ -576,7 +576,7 @@ class _ResetPasswordDialog(QDialog):
 
     def _on_accept(self):
         if len(self.password_edit.text()) < 4:
-            QMessageBox.warning(self, "Validation", "Password must be at least 4 characters.")
+            QMessageBox.warning(self, "Validation", "Password must be at least 8 characters.")
             return
         self.accept()
 

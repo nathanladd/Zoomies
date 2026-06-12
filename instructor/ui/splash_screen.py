@@ -117,6 +117,10 @@ class StartupDialog(QDialog):
 
         QTimer.singleShot(0, self._start)
 
+    @property
+    def conn(self) -> dict:
+        return self._conn
+
     # ── logging ───────────────────────────────────────────────────────────────
 
     def _log_line(self, text: str, color: str | None = None) -> None:
