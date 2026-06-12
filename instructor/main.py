@@ -253,7 +253,7 @@ class MainWindow(QMainWindow):
 
     def _run_update_check(self, *, silent_if_current: bool, skipped_version: str | None) -> None:
         from instructor.update_checker import UpdateChecker
-        checker = UpdateChecker(self.api.base_url)
+        checker = UpdateChecker()
         self._update_checkers.append(checker)
 
         def _cleanup() -> None:

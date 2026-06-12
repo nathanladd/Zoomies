@@ -34,10 +34,6 @@ else:
 DATA_DIR = USER_DATA_DIR / "database"
 MEDIA_DIR = USER_DATA_DIR / "media" / "questions"
 BACKUPS_DIR = USER_DATA_DIR / "backups"
-# In frozen mode (instructor app on Windows) there is no release to serve, but we
-# define the path consistently. The server always runs from source (not frozen), so
-# RELEASES_DIR points at the repo checkout — git pull auto-deploys latest.json.
-RELEASES_DIR = USER_DATA_DIR / "releases" if IS_FROZEN else BASE_DIR / "releases"
 
 DB_FILENAME = "zoomies.db"
 DB_PATH = DATA_DIR / DB_FILENAME
@@ -59,7 +55,6 @@ DATABASE_URL = f"sqlite+aiosqlite:///{DB_PATH}"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
-RELEASES_DIR.mkdir(parents=True, exist_ok=True)
 
 SERVER_HOST = os.environ.get("ZOOMIES_HOST", "127.0.0.1")
 SERVER_PORT = int(os.environ.get("ZOOMIES_PORT", "5000"))

@@ -39,8 +39,8 @@ build/
 *.log
 *.err
 
-# Releases — manifest is tracked, installer EXEs are not (too large for git)
-releases/*.exe
+# Releases — built locally, not tracked in git
+releases/
 
 # Secrets and local runtime files
 jwt_secret.txt
