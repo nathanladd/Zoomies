@@ -61,8 +61,8 @@ MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
 RELEASES_DIR.mkdir(parents=True, exist_ok=True)
 
-SERVER_HOST = "127.0.0.1"
-SERVER_PORT = 5000
+SERVER_HOST = os.environ.get("ZOOMIES_HOST", "127.0.0.1")
+SERVER_PORT = int(os.environ.get("ZOOMIES_PORT", "5000"))
 
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
 MAX_IMAGE_WIDTH = 1920
