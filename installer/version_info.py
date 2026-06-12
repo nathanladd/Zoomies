@@ -6,7 +6,7 @@ documented at https://pyinstaller.org/en/stable/spec-files.html#capturing-window
 every build keeps the Windows "Properties → Details" tab in sync with
 version.py.
 
-This module is imported from Rudi.spec at build time and also works as a
+This module is imported from Zoomies.spec at build time and also works as a
 standalone script for manual inspection:
 
     .venv\\Scripts\\python.exe installer\\version_info.py
@@ -51,12 +51,12 @@ VSVersionInfo(
                 u"040904B0",
                 [
                     StringStruct(u"CompanyName", u"Nathan Ladd"),
-                    StringStruct(u"FileDescription", u"Rudi quiz engine"),
+                    StringStruct(u"FileDescription", u"Zoomies quiz engine"),
                     StringStruct(u"FileVersion", u"{version}"),
-                    StringStruct(u"InternalName", u"Rudi"),
+                    StringStruct(u"InternalName", u"Zoomies"),
                     StringStruct(u"LegalCopyright", u"© Nathan Ladd"),
-                    StringStruct(u"OriginalFilename", u"Rudi.exe"),
-                    StringStruct(u"ProductName", u"Rudi"),
+                    StringStruct(u"OriginalFilename", u"Zoomies.exe"),
+                    StringStruct(u"ProductName", u"Zoomies"),
                     StringStruct(u"ProductVersion", u"{version}"),
                 ],
             )

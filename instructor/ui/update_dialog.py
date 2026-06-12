@@ -87,7 +87,7 @@ class UpdateDialog(QDialog):
         root.setSpacing(12)
 
         header = QLabel(
-            f"<b>Rudi {self.latest_version} is available</b>"
+            f"<b>Zoomies {self.latest_version} is available</b>"
             f"  <span style='color:#888;font-weight:normal;'>(you have v{__version__})</span>"
         )
         header.setStyleSheet("font-size: 14px;")
@@ -123,7 +123,6 @@ class UpdateDialog(QDialog):
         btn_row.setContentsMargins(0, 4, 0, 0)
         btn_row.addStretch()
 
-        self._btn_skip = QPushButton("Skip This Version")
         self._btn_later = QPushButton("Remind Me Later")
         self._btn_update = QPushButton("Update Now")
         self._btn_update.setStyleSheet(
@@ -132,11 +131,9 @@ class UpdateDialog(QDialog):
             "QPushButton:hover { background-color: #005a9e; } "
             "QPushButton:pressed { background-color: #004880; }"
         )
-        self._btn_skip.clicked.connect(self._on_skip)
         self._btn_later.clicked.connect(self._on_later)
         self._btn_update.clicked.connect(self._on_update_now)
 
-        btn_row.addWidget(self._btn_skip)
         btn_row.addWidget(self._btn_later)
         btn_row.addWidget(self._btn_update)
         root.addWidget(self._btn_widget)
@@ -149,11 +146,6 @@ class UpdateDialog(QDialog):
 
     # ── button handlers ───────────────────────────────────────────────────────
 
-    def _on_skip(self) -> None:
-        from instructor.app_settings import save as save_settings
-        save_settings(skipped_version=self.latest_version)
-        self.reject()
-
     def _on_later(self) -> None:
         self.reject()
 
@@ -163,7 +155,7 @@ class UpdateDialog(QDialog):
         self._btn_cancel.show()
         self.adjustSize()
 
-        filename = self.download_url.split("/")[-1] or f"Rudi-Setup-{self.latest_version}.exe"
+        filename = self.download_url.split("/")[-1] or f"Zoomies-Setup-{self.latest_version}.exe"
         dest = os.path.join(tempfile.gettempdir(), filename)
 
         self._thread = _DownloadThread(self.download_url, dest)

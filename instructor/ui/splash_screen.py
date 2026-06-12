@@ -35,7 +35,7 @@ class StartupDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Rudi v{__version__}")
+        self.setWindowTitle(f"Zoomies v{__version__}")
         self.setMinimumWidth(560)
         self.setWindowFlags(
             Qt.WindowType.Dialog
@@ -183,7 +183,7 @@ class StartupDialog(QDialog):
         port = self._conn["server_port"]
         self._base_url = f"{_http_scheme(port)}://{host}:{port}"
 
-        self._log_line(f"Rudi v{__version__} starting")
+        self._log_line(f"Zoomies v{__version__} starting")
         self._log_line(f"Connecting to {self._base_url} ...")
 
         if not self._check_reachable(host, port):

@@ -11,16 +11,14 @@ IS_FROZEN = getattr(sys, "frozen", False)
 if IS_FROZEN:
     BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
     _LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", Path.home()))
-    USER_DATA_DIR = _LOCALAPPDATA / "Rudi"
-    # One-time migration: if this is an upgrade from a pre-rename install,
-    # the user's data is still under LOCALAPPDATA\Zundpunkt. Move the whole
-    # tree over so their question bank, uploaded media, and backups follow.
-    _legacy_user_dir = _LOCALAPPDATA / "Zundpunkt"
-    if _legacy_user_dir.exists() and not USER_DATA_DIR.exists():
-        try:
-            _legacy_user_dir.rename(USER_DATA_DIR)
-        except OSError:
-            pass
+    USER_DATA_DIR = _LOCALAPPDATA / "Zoomies"
+    # One-time migrations: rename legacy data dirs on first run after a rebrand.
+    for _legacy in (_LOCALAPPDATA / "Rudi", _LOCALAPPDATA / "Zundpunkt"):
+        if _legacy.exists() and not USER_DATA_DIR.exists():
+            try:
+                _legacy.rename(USER_DATA_DIR)
+            except OSError:
+                pass
 elif sys.platform != "win32":
     # Linux server deployment: variable data (database, media, backups) lives
     # under /var/opt/zoomies, separate from the read-only app code in /opt/zoomies

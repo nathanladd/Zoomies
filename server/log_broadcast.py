@@ -44,7 +44,7 @@ class LogBroadcaster:
         await ws.accept()
         async with self._lock:
             self._clients.add(ws)
-        await ws.send_text("=== Rudi server log connected ===")
+        await ws.send_text("=== Zoomies server log connected ===")
 
     async def disconnect(self, ws: WebSocket) -> None:
         async with self._lock:

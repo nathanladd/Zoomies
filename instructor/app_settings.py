@@ -10,7 +10,6 @@ from pathlib import Path
 
 _DEFAULTS: dict = {
     "auto_check_updates": True,
-    "skipped_version": None,
 }
 
 
@@ -19,7 +18,7 @@ def _path() -> Path:
         import os
         local = os.environ.get("LOCALAPPDATA", "")
         if local:
-            return Path(local) / "Rudi" / "app_settings.json"
+            return Path(local) / "Zoomies" / "app_settings.json"
     return Path(__file__).resolve().parent.parent / "app_settings.json"
 
 
@@ -32,8 +31,6 @@ def load() -> dict:
                 data = json.load(f)
             if isinstance(data.get("auto_check_updates"), bool):
                 settings["auto_check_updates"] = data["auto_check_updates"]
-            if "skipped_version" in data:
-                settings["skipped_version"] = data["skipped_version"]
         except Exception:
             pass
     return settings

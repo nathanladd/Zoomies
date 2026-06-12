@@ -24,7 +24,7 @@ class ProjectionWindow(QWidget):
         self.join_code = join_code
         self.server_host = server_host
         self.server_port = server_port
-        self.setWindowTitle(f"Rudi v{__version__} — Projection")
+        self.setWindowTitle(f"Zoomies v{__version__} — Projection")
         self.setMinimumSize(1024, 700)
         self.setStyleSheet("background-color: #FFFFFF; color: #333333;")
 

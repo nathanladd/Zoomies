@@ -13,9 +13,9 @@ from instructor.game.control_panel import GameControlPanel
 from instructor.ui.scoring_window import SettingsWindow
 from version import __version__
 
-# Name must match AppMutex in installer/Rudi.iss so Inno Setup can detect
+# Name must match AppMutex in installer/Zoomies.iss so Inno Setup can detect
 # a running instance during install/uninstall and offer to close it.
-SINGLETON_MUTEX_NAME = "RudiSingletonMutex"
+SINGLETON_MUTEX_NAME = "ZoomiesSingletonMutex"
 _SINGLETON_MUTEX_HANDLE = None
 
 
@@ -25,7 +25,7 @@ def _acquire_singleton_mutex() -> None:
     The handle is stashed on a module global so Python doesn't GC it — the OS
     releases the mutex automatically when the process exits. Never blocks or
     refuses startup; a pre-existing mutex just means the installer will see
-    "Rudi is running" and prompt the user.
+    "Zoomies is running" and prompt the user.
     """
     global _SINGLETON_MUTEX_HANDLE
     if sys.platform != "win32":
@@ -46,7 +46,7 @@ def _acquire_singleton_mutex() -> None:
 class MainWindow(QMainWindow):
     def __init__(self, api: ApiClient, server_host: str, server_port: int):
         super().__init__()
-        self.setWindowTitle(f"Rudi v{__version__}")
+        self.setWindowTitle(f"Zoomies v{__version__}")
         self.setMinimumSize(1000, 700)
 
         self.server_host = server_host
@@ -238,20 +238,12 @@ class MainWindow(QMainWindow):
         settings = load_settings()
         if not settings.get("auto_check_updates", True):
             return
-        self._run_update_check(
-            silent_if_current=True,
-            skipped_version=settings.get("skipped_version"),
-        )
+        self._run_update_check(silent_if_current=True)
 
     def _check_for_updates(self) -> None:
-        from instructor.app_settings import load as load_settings
-        settings = load_settings()
-        self._run_update_check(
-            silent_if_current=False,
-            skipped_version=settings.get("skipped_version"),
-        )
+        self._run_update_check(silent_if_current=False)
 
-    def _run_update_check(self, *, silent_if_current: bool, skipped_version: str | None) -> None:
+    def _run_update_check(self, *, silent_if_current: bool) -> None:
         from instructor.update_checker import UpdateChecker
         checker = UpdateChecker()
         self._update_checkers.append(checker)
@@ -263,24 +255,17 @@ class MainWindow(QMainWindow):
                 pass
             checker.deleteLater()
 
-        checker.update_available.connect(
-            lambda ver, notes, url, sha:
-                self._on_update_available(ver, notes, url, sha, skipped_version)
-        )
+        checker.update_available.connect(self._on_update_available)
         if not silent_if_current:
             checker.up_to_date.connect(
                 lambda: QMessageBox.information(
-                    self, "No Updates", f"Rudi v{__version__} is up to date."
+                    self, "No Updates", f"Zoomies v{__version__} is up to date."
                 )
             )
         checker.finished.connect(_cleanup)
         checker.start()
 
-    def _on_update_available(
-        self, ver: str, notes: str, url: str, sha: str, skipped_version: str | None
-    ) -> None:
-        if skipped_version == ver:
-            return
+    def _on_update_available(self, ver: str, notes: str, url: str, sha: str) -> None:
         from instructor.ui.update_dialog import UpdateDialog
         dlg = UpdateDialog(ver, notes, url, sha, parent=self)
         dlg.exec()
@@ -305,7 +290,7 @@ class MainWindow(QMainWindow):
 
 def main():
     # Claim the named mutex before anything heavy so a parallel installer run
-    # can see "Rudi is running" as soon as possible.
+    # can see "Zoomies is running" as soon as possible.
     _acquire_singleton_mutex()
 
     app = QApplication(sys.argv)
@@ -313,7 +298,7 @@ def main():
 
     from pathlib import Path
     from PyQt6.QtGui import QIcon
-    _icon_path = Path(__file__).parent.parent / "installer" / "Rudi_App_Icon.ico"
+    _icon_path = Path(__file__).parent.parent / "installer" / "Zoomies_App_Icon.ico"
     if _icon_path.exists():
         app.setWindowIcon(QIcon(str(_icon_path)))
 

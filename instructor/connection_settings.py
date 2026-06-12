@@ -18,7 +18,7 @@ def _settings_path() -> Path:
         import os
         local_app_data = os.environ.get("LOCALAPPDATA", "")
         if local_app_data:
-            return Path(local_app_data) / "Rudi" / "connection.json"
+            return Path(local_app_data) / "Zoomies" / "connection.json"
         return Path(sys.executable).parent / "connection.json"
     return Path(__file__).resolve().parent.parent / "connection.json"
 

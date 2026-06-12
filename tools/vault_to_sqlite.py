@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-vault_to_sqlite.py — Bulk-import Obsidian lesson-question markdown files into Rudi via the REST API.
+vault_to_sqlite.py — Bulk-import Obsidian lesson-question markdown files into Zoomies via the REST API.
 
 No external dependencies beyond the Python standard library.
 
@@ -10,7 +10,7 @@ Usage:
 
 Defaults (reads connection.json from the project root if present):
     vault_dir   C:\\Users\\natha\\OneDrive\\Documents\\Vault\\Atlas\\Lesson Questions
-    server      https://rudi-server.duckdns.org  (from connection.json)
+    server      http://localhost:5000  (from connection.json)
     user        instructor
     password    rudi
 
@@ -22,7 +22,7 @@ Expected vault layout:
             S770 Hydraulics Questions.md
         ...
 
-    Each subdirectory name becomes a topic in Rudi.
+    Each subdirectory name becomes a topic in Zoomies.
     Root-level .md files are skipped (they are index files).
 
 Question file format — questions separated by --- dividers:
@@ -53,7 +53,7 @@ Frontmatter tags:
     (default)        -> multiple_choice
 
 "Choose all that apply" questions (multiple green spans) are reported and skipped —
-Rudi only supports a single correct answer per question.
+Zoomies only supports a single correct answer per question.
 
 Duplicate detection: any question already on the server with the same text + correct
 answer is skipped, so it is safe to run this script more than once.
@@ -195,7 +195,7 @@ def parse_vault_file(path: Path) -> tuple[list[dict], list[str]]:
 # REST API client (stdlib only)
 # ---------------------------------------------------------------------------
 
-class RudiClient:
+class ZoomiesClient:
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip('/')
         self._token: str | None = None
@@ -247,7 +247,7 @@ class RudiClient:
 # Import logic
 # ---------------------------------------------------------------------------
 
-def run_import(vault_dir: Path, client: RudiClient, dry_run: bool) -> None:
+def run_import(vault_dir: Path, client: ZoomiesClient, dry_run: bool) -> None:
     if not vault_dir.exists():
         sys.exit(f'ERROR: vault directory not found:\n  {vault_dir}')
 
@@ -382,7 +382,7 @@ def main() -> None:
     defaults = _load_connection_defaults()
 
     ap = argparse.ArgumentParser(
-        description='Import Obsidian lesson-question markdown files into Rudi via the REST API.',
+        description='Import Obsidian lesson-question markdown files into Zoomies via the REST API.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     ap.add_argument('vault_dir', nargs='?', type=Path, default=_VAULT_DEFAULT,
@@ -404,7 +404,7 @@ def main() -> None:
     else:
         print()
 
-    client = RudiClient(args.server)
+    client = ZoomiesClient(args.server)
     if not args.dry_run:
         print(f'Logging in as {args.user}...')
         try:

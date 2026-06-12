@@ -1,12 +1,12 @@
 <#
 .SYNOPSIS
-    Build the Rudi Windows installer end-to-end.
+    Build the Zoomies Windows installer end-to-end.
 
 .DESCRIPTION
     1. Reads __version__ from version.py.
     2. Cleans previous dist/ and build/ output.
-    3. Runs PyInstaller against Rudi.spec to produce dist\Rudi\.
-    4. Invokes Inno Setup (ISCC.exe) to produce dist\installer\Rudi-Setup-<version>.exe.
+    3. Runs PyInstaller against Zoomies.spec to produce dist\Zoomies\.
+    4. Invokes Inno Setup (ISCC.exe) to produce dist\installer\Zoomies-Setup-<version>.exe.
 
 .PARAMETER SkipPyInstaller
     Skip the PyInstaller step (useful when iterating on the .iss only).
@@ -55,13 +55,13 @@ Write-Host "[build] Python: $PythonExe" -ForegroundColor Cyan
 if (-not $SkipPyInstaller) {
     Write-Host "[build] Cleaning previous PyInstaller output..." -ForegroundColor Cyan
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "$ProjectRoot\build"
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "$ProjectRoot\dist\Rudi"
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "$ProjectRoot\dist\Zoomies"
 
     Write-Host "[build] Running PyInstaller..." -ForegroundColor Cyan
-    & $PythonExe -m PyInstaller "Rudi.spec" --noconfirm --clean
+    & $PythonExe -m PyInstaller "Zoomies.spec" --noconfirm --clean
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed with exit code $LASTEXITCODE" }
 
-    $bundleExe = Join-Path $ProjectRoot "dist\Rudi\Rudi.exe"
+    $bundleExe = Join-Path $ProjectRoot "dist\Zoomies\Zoomies.exe"
     if (-not (Test-Path $bundleExe)) { throw "PyInstaller did not produce $bundleExe" }
     Write-Host "[build] PyInstaller bundle ready: $bundleExe" -ForegroundColor Green
 } else {
@@ -90,10 +90,10 @@ if (-not $SkipInstaller) {
 
     New-Item -ItemType Directory -Force -Path "$ProjectRoot\dist\installer" | Out-Null
 
-    & $iscc "/DAppVersion=$AppVersion" (Join-Path $ProjectRoot "installer\Rudi.iss")
+    & $iscc "/DAppVersion=$AppVersion" (Join-Path $ProjectRoot "installer\Zoomies.iss")
     if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed with exit code $LASTEXITCODE" }
 
-    $installer = Join-Path $ProjectRoot "dist\installer\Rudi-Setup-$AppVersion.exe"
+    $installer = Join-Path $ProjectRoot "dist\installer\Zoomies-Setup-$AppVersion.exe"
     if (Test-Path $installer) {
         Write-Host "[build] Installer ready: $installer" -ForegroundColor Green
     } else {
