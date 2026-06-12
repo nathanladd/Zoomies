@@ -9,7 +9,7 @@ from version import __version__
 
 
 class ProjectionWindow(QWidget):
-    """Fullscreen projection display for Rudi games.
+    """Fullscreen projection display for Zoomies games.
 
     Shows question text, optional image, timer, answer count, and leaderboard.
     Answer choices are NOT shown here — students see them on their own devices.
@@ -277,14 +277,8 @@ class ProjectionWindow(QWidget):
             )
         self.question_label.setText(
             f'<div style="text-align:center;">'
-            f'<div style="font-size:64px; font-weight:bold; color:#0078D4; margin-bottom:12px; letter-spacing:2px;">RUDI</div>'
-            f'<div style="font-size:18px; font-style:italic; color:#555555; margin-bottom:6px; line-height:1.4;">'
-            f'Named for Rudolf Christian Karl Diesel &mdash.'
-            f'</div>'
-            f'<div style="font-size:15px; color:#777777; margin-bottom:14px;">A classroom quiz game.</div>'
-            f'<div style="font-size:17px; font-style:italic; color:#0078D4; margin-bottom:24px;">'
-            f'&ldquo;Do not fear failure, but rather fear not trying at all.&rdquo; &mdash; Rudolf Diesel'
-            f'</div>'
+            f'<div style="font-size:64px; font-weight:bold; color:#0078D4; margin-bottom:12px; letter-spacing:2px;">Zoomies</div>'
+            f'<div style="font-size:15px; color:#777777; margin-bottom:24px;">A classroom quiz game.</div>'
             f'<div style="font-size:20px; color:#555555; margin-bottom:4px;">Join at</div>'
             f'<div style="font-size:40px; font-weight:bold; color:#0078D4; margin-bottom:16px;">{self._join_url}</div>'
             f'<div style="font-size:32px; font-weight:bold; color:#2E7D32; margin-bottom:16px;">{game_text}</div>'
