@@ -1,6 +1,6 @@
 """Persistent app-level settings for the instructor desktop app.
 
-Stored separately from connection_settings.py (which holds server host/port/creds).
+Stored separately from connection_settings.py (which holds server host/port).
 """
 from __future__ import annotations
 

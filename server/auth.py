@@ -24,12 +24,6 @@ _CREDENTIALS_FILE = DATA_DIR / "credentials.json"
 _SECRET_FILE = DATA_DIR / "jwt_secret.txt"
 _TOKEN_HOURS = 24
 
-_DEFAULT_USERS = [
-    {"username": "Nate",   "password": "ruettiger",  "role": "admin"},
-    {"username": "George", "password": "slurry",     "role": "instructor"},
-    {"username": "Brian",  "password": "ubiquitous", "role": "instructor"},
-]
-
 _bearer = HTTPBearer(auto_error=False)
 
 _jwt_secret: str | None = None
@@ -92,14 +86,13 @@ def _get_users() -> list[dict]:
                 return _users
         except Exception:
             pass
-    # First run — seed default accounts
-    _users = [
-        _make_user(u["username"], hash_password(u["password"]), role=u["role"], active=True)
-        for u in _DEFAULT_USERS
-    ]
-    _CREDENTIALS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _persist()
+    _users = []
     return _users
+
+
+def is_setup_needed() -> bool:
+    """True when no user accounts exist (fresh deployment)."""
+    return len(_get_users()) == 0
 
 
 def _make_user(username: str, password_hash: str, *, role: str, active: bool) -> dict:

@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from server.auth import (
     authenticate, change_password, require_auth, require_admin,
     list_users, add_user, update_user, delete_user,
+    is_setup_needed, create_token,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -40,6 +41,34 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
+class SetupRequest(BaseModel):
+    username: str
+    password: str
+
+
+@router.get("/setup")
+async def get_setup_status():
+    """Returns whether first-run setup is needed (no user accounts exist)."""
+    return {"setup_needed": is_setup_needed()}
+
+
+@router.post("/setup", response_model=LoginResponse)
+async def initial_setup(body: SetupRequest):
+    """Create the first admin account. Only works when no users exist."""
+    if not is_setup_needed():
+        raise HTTPException(status_code=409, detail="Setup already complete")
+    if not body.username.strip():
+        raise HTTPException(status_code=400, detail="Username is required")
+    if len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    try:
+        add_user(body.username.strip(), body.password, role="admin")
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    token = create_token(body.username.strip(), "admin")
+    return LoginResponse(token=token, username=body.username.strip(), role="admin")
+
+
 @router.post("/login", response_model=LoginResponse)
 async def login(body: LoginRequest):
     result = authenticate(body.username, body.password)
@@ -55,8 +84,8 @@ async def change_own_password(
 ):
     if authenticate(username, body.current_password) is None:
         raise HTTPException(status_code=401, detail="Current password is incorrect")
-    if len(body.new_password) < 4:
-        raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
     change_password(username, body.new_password)
     return {"status": "ok"}
 
@@ -70,8 +99,8 @@ async def get_users(_admin: str = Depends(require_admin)):
 async def create_user_endpoint(body: CreateUserRequest, _admin: str = Depends(require_admin)):
     if body.role not in ("admin", "instructor"):
         raise HTTPException(status_code=400, detail="role must be 'admin' or 'instructor'")
-    if len(body.password) < 4:
-        raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+    if len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
     try:
         return add_user(body.username, body.password, body.role)
     except ValueError as e:
@@ -103,8 +132,8 @@ async def patch_user_endpoint(
 async def reset_user_password(
     username: str, body: ResetPasswordRequest, _admin: str = Depends(require_admin)
 ):
-    if len(body.new_password) < 4:
-        raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
     try:
         change_password(username, body.new_password)
     except KeyError:

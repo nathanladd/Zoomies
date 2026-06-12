@@ -485,11 +485,9 @@ class ConnectionPanel(QWidget):
             self.pass_status.setText(str(e))
             self.pass_status.setStyleSheet("color: #E53935; font-size: 12px;")
             return
-        # Keep connection.json in sync so auto-login still works after restart.
         try:
             s = load_connection()
-            save_connection(s["server_host"], s["server_port"],
-                            username=self.api.username, password=new)
+            save_connection(s["server_host"], s["server_port"])
         except Exception:
             pass
         self.current_pass_edit.clear()
