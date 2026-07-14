@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from server.constants import TIME_DEFAULT, TIME_MIN, TIME_MAX
+
 
 # ── Topic ──────────────────────────────────────────────────────────────────────
 
@@ -33,7 +35,7 @@ class QuestionCreate(BaseModel):
     wrong_answer_1: str
     wrong_answer_2: str | None = None
     wrong_answer_3: str | None = None
-    time_seconds: int = Field(default=20, ge=5, le=30)
+    time_seconds: int = Field(default=TIME_DEFAULT, ge=TIME_MIN, le=TIME_MAX)
     randomize_answers: bool | None = None
     correct_index: int = Field(default=0, ge=0, le=3)
 
@@ -45,7 +47,7 @@ class QuestionUpdate(BaseModel):
     wrong_answer_1: str | None = None
     wrong_answer_2: str | None = None
     wrong_answer_3: str | None = None
-    time_seconds: int | None = Field(default=None, ge=5, le=30)
+    time_seconds: int | None = Field(default=None, ge=TIME_MIN, le=TIME_MAX)
     randomize_answers: bool | None = None
     correct_index: int | None = Field(default=None, ge=0, le=3)
 

@@ -66,6 +66,6 @@ POINTS_MAX = 1000
 POINTS_MIN = 100
 ELIMINATION_MARKS = (0.33, 0.66)
 
-TIME_DEFAULT = 10
-TIME_MIN = 5
-TIME_MAX = 30
+# Answer-time bounds live in the side-effect-free server.constants module so the
+# instructor client can import them without pulling in this module's setup work.
+from server.constants import TIME_DEFAULT, TIME_MIN, TIME_MAX  # noqa: F401,E402

@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QPixmap
 
 from instructor.api_client import ApiClient
+from server.constants import TIME_DEFAULT, TIME_MIN, TIME_MAX
 
 import httpx
 
@@ -322,11 +323,11 @@ class QuestionDialog(QDialog):
         # Time slider
         time_row = QHBoxLayout()
         self.time_slider = QSlider(Qt.Orientation.Horizontal)
-        self.time_slider.setRange(5, 30)
-        self.time_slider.setValue(20)
-        self.time_slider.setTickInterval(5)
+        self.time_slider.setRange(TIME_MIN, TIME_MAX)
+        self.time_slider.setValue(TIME_DEFAULT)
+        self.time_slider.setTickInterval(15)
         self.time_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.time_label = QLabel("20s")
+        self.time_label = QLabel(f"{TIME_DEFAULT}s")
         self.time_slider.valueChanged.connect(lambda v: self.time_label.setText(f"{v}s"))
         time_row.addWidget(self.time_slider)
         time_row.addWidget(self.time_label)
