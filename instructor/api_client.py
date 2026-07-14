@@ -139,6 +139,16 @@ class ApiClient:
         resp = self.client.delete(f"/api/questions/{question_id}/stats")
         _raise_for_status(resp)
 
+    def get_note(self, question_id: int) -> dict[str, Any]:
+        """Return the discussion/citations note for a question.
+
+        Raises RuntimeError (from _raise_for_status) with a 404 detail when the
+        question has no note; callers treat that as "no note to show".
+        """
+        resp = self.client.get(f"/api/questions/{question_id}/note")
+        _raise_for_status(resp)
+        return resp.json()
+
     # ── Quizzes ────────────────────────────────────────────────────────────
 
     def list_quizzes(self) -> list[dict[str, Any]]:

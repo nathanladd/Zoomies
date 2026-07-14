@@ -154,6 +154,9 @@ class GameControlPanel(QWidget):
     # to /api/questions/{id}/stats finishes. Carries (question_id, stats_dict)
     # so the GUI slot can verify the result still matches the active question.
     _stats_loaded = pyqtSignal(int, dict)
+    # Carries (question_id, note_dict) from the background note-fetch thread.
+    # note_dict is empty when the question has no note.
+    _note_loaded = pyqtSignal(int, dict)
     _version_loaded = pyqtSignal(str, str)  # (label_text, stylesheet)
     _image_loaded = pyqtSignal(str, object)  # (image_url key, raw bytes or None)
     _status_polled = pyqtSignal(int)  # active_games count
@@ -178,6 +181,7 @@ class GameControlPanel(QWidget):
         self._build_ui()
         # Marshal background-thread stat results back onto the GUI thread.
         self._stats_loaded.connect(self._on_stats_loaded)
+        self._note_loaded.connect(self._on_note_loaded)
         self._version_loaded.connect(self._on_version_loaded)
         self._image_loaded.connect(self._on_image_loaded)
         self._status_polled.connect(self._on_status_polled)
@@ -323,6 +327,32 @@ class GameControlPanel(QWidget):
         # decide which stats payload to apply when refreshes return.
         self._current_question_id: int | None = None
         layout.addWidget(qa_group)
+
+        # ── Discussion & References ───────────────────────────────────────
+        # Instructor-only notes (discussion prompts + source citations) pulled
+        # from the question's `notes` row. Hidden entirely when the current
+        # question has no note so it doesn't leave an empty box on screen.
+        self.notes_group = QGroupBox("Discussion & References")
+        notes_layout = QVBoxLayout(self.notes_group)
+        self.notes_discussion_label = QLabel("")
+        self.notes_discussion_label.setWordWrap(True)
+        self.notes_discussion_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.notes_discussion_label.setStyleSheet("font-size: 13px; padding: 4px;")
+        notes_layout.addWidget(self.notes_discussion_label)
+        self.notes_citations_label = QLabel("")
+        self.notes_citations_label.setWordWrap(True)
+        self.notes_citations_label.setOpenExternalLinks(True)
+        self.notes_citations_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextBrowserInteraction
+        )
+        self.notes_citations_label.setStyleSheet(
+            "color: #555555; font-size: 12px; padding: 4px;"
+        )
+        notes_layout.addWidget(self.notes_citations_label)
+        self.notes_group.hide()
+        layout.addWidget(self.notes_group)
 
         # ── Dockable panels (built here, docked by MainWindow) ────────────
         # The leaderboard and both consoles live in QDockWidgets owned by
@@ -588,6 +618,7 @@ class GameControlPanel(QWidget):
             # Stats fetch hits the HTTP API synchronously; run it on a
             # worker thread so a slow response can't freeze the projector.
             self._fetch_question_stats_async(self._current_question_id)
+            self._fetch_question_note_async(self._current_question_id)
 
         elif msg_type == "question_answer":
             self._highlight_correct(msg.get("correct_answer", ""))
@@ -723,6 +754,10 @@ class GameControlPanel(QWidget):
             self._qa_choice_labels.append(lbl)
             self._qa_stat_labels.append(stat)
         self.qa_stats_summary.setText("")
+        # Hide any prior question's note until this one's fetch returns.
+        self.notes_discussion_label.clear()
+        self.notes_citations_label.clear()
+        self.notes_group.hide()
 
     def _clear_choice_rows(self):
         """Remove all choice/stat rows from qa_choices_layout."""
@@ -832,6 +867,50 @@ class GameControlPanel(QWidget):
             ]
             self.qa_stats_summary.setText("  ·  ".join(parts))
 
+    def _fetch_question_note_async(self, question_id: int | None) -> None:
+        """Fetch the question's discussion/citations note on a worker thread
+        and emit it back to the GUI thread via ``_note_loaded``.
+
+        Mirrors ``_fetch_question_stats_async``: the HTTP roundtrip stays off
+        the GUI thread so the projector never stutters. A 404 (no note for the
+        question) surfaces as a RuntimeError, which we swallow and report as an
+        empty note so the slot hides the panel.
+        """
+        if question_id is None:
+            return
+        target = int(question_id)
+
+        def _worker() -> None:
+            try:
+                note = self.api.get_note(target)
+            except Exception:
+                note = None  # 404 / offline → treated as "no note"
+            self._note_loaded.emit(target, note if isinstance(note, dict) else {})
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_note_loaded(self, question_id: int, note: dict) -> None:
+        """GUI-thread slot: render the note fetched by the worker thread.
+
+        Discards results for a question the instructor has already moved past,
+        matching the guard used for stats.
+        """
+        if self._current_question_id != question_id:
+            return
+        discussion = (note.get("discussion") or "").strip()
+        citations = (note.get("citations") or "").strip()
+        if discussion:
+            self.notes_discussion_label.setText(discussion)
+            self.notes_discussion_label.show()
+        else:
+            self.notes_discussion_label.hide()
+        if citations:
+            self.notes_citations_label.setText(f"References:\n{citations}")
+            self.notes_citations_label.show()
+        else:
+            self.notes_citations_label.hide()
+        self.notes_group.setVisible(bool(discussion or citations))
+
     def _highlight_correct(self, correct: str):
         for lbl in self._qa_choice_labels:
             text = lbl.text().strip()
@@ -848,6 +927,9 @@ class GameControlPanel(QWidget):
         self._current_image_url = None
         self._clear_choice_rows()
         self.qa_stats_summary.setText("")
+        self.notes_discussion_label.clear()
+        self.notes_citations_label.clear()
+        self.notes_group.hide()
         self._current_question_id = None
 
     def _update_leaderboard_from_players(self):
