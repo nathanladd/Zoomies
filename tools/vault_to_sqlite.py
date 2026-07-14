@@ -40,7 +40,7 @@ Question file format — questions separated by --- dividers:
     - C. Another wrong option
     - D. Yet another wrong option
 
-    > **Citations:** Operator manual, p. 42.
+    > **References:** Operator manual, p. 42.
 
     ---
 
@@ -80,7 +80,7 @@ _CORRECT_SPAN = re.compile(
 _ANSWER_LINE = re.compile(r'^\s*-\s+(?:[A-D]\.\s+)?(\S.+)$')
 _QUESTION_LINE = re.compile(r'^\*\*(.+?)\*\*\s*$')
 _DISCUSSION_HEADER = re.compile(r'^>\s*\*\*Discussion:\*\*\s*', re.IGNORECASE)
-_CITATIONS_HEADER = re.compile(r'^>\s*\*\*Citations:\*\*\s*', re.IGNORECASE)
+_CITATIONS_HEADER = re.compile(r'^>\s*\*\*(?:Citations|References):\*\*\s*', re.IGNORECASE)
 _BLOCKQUOTE_LINE = re.compile(r'^>\s?')
 
 
@@ -379,6 +379,14 @@ def _load_connection_defaults() -> dict:
 
 
 def main() -> None:
+    # Windows consoles often default to cp1252, which crashes on characters
+    # like the arrow (→) that appear in question text. Force UTF-8 output
+    # and fall back to replacement rather than raising on anything unprintable.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, 'reconfigure', None)
+        if reconfigure is not None:
+            reconfigure(encoding='utf-8', errors='replace')
+
     defaults = _load_connection_defaults()
 
     ap = argparse.ArgumentParser(
