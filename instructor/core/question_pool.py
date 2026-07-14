@@ -339,6 +339,23 @@ class QuestionDialog(QDialog):
         self.randomize_check.toggled.connect(self._on_randomize_user_toggle)
         layout.addRow("", self.randomize_check)
 
+        # Discussion & References — stored in the question's `note` row via the
+        # /api/questions/{id}/note endpoint (a 1:1 side table), not on the
+        # question record itself. Shown for the instructor's "Discussion &
+        # References" panel during a game. `_note_existed` tracks whether the
+        # question already had a note so we only PUT on save when there's
+        # something to store or clear.
+        self._note_existed = False
+        self.discussion_input = QTextEdit()
+        self.discussion_input.setPlaceholderText("Discussion / talking points shown to the instructor (optional)")
+        self.discussion_input.setMaximumHeight(70)
+        layout.addRow("Discussion:", self.discussion_input)
+
+        self.citations_input = QTextEdit()
+        self.citations_input.setPlaceholderText("Source citations / references, e.g. Operator manual, p. 42 (optional)")
+        self.citations_input.setMaximumHeight(70)
+        layout.addRow("References:", self.citations_input)
+
         # Populate if editing
         if question:
             self.type_combo.setCurrentText(question.get("question_type", "multiple_choice"))
@@ -403,6 +420,7 @@ class QuestionDialog(QDialog):
         # and load the cumulative tally for the current question.
         if question and question.get("id") is not None:
             self._load_stats()
+            self._load_note()
         else:
             self._set_row_visible(self._row_stats, False)
 
@@ -648,6 +666,39 @@ class QuestionDialog(QDialog):
             return
         self._load_stats()
 
+    # ── Discussion & References note ───────────────────────────────────
+    def _load_note(self):
+        """Fetch the question's existing note (if any) into the text fields.
+
+        A 404 simply means the question has no note yet, which is fine — the
+        fields stay empty and `_note_existed` stays False.
+        """
+        if not self.question:
+            return
+        qid = self.question.get("id")
+        if qid is None:
+            return
+        try:
+            note = self.api.get_note(int(qid))
+        except Exception:
+            note = None  # 404 / offline → treat as "no note yet"
+        if isinstance(note, dict):
+            self._note_existed = True
+            self.discussion_input.setPlainText(note.get("discussion") or "")
+            self.citations_input.setPlainText(note.get("citations") or "")
+
+    def get_note_data(self) -> dict:
+        """Return the discussion/citations to save, empty strings collapsed to None."""
+        return {
+            "discussion": self.discussion_input.toPlainText().strip() or None,
+            "citations": self.citations_input.toPlainText().strip() or None,
+        }
+
+    def note_needs_save(self) -> bool:
+        """True when there's note content to store, or a prior note to clear."""
+        data = self.get_note_data()
+        return bool(data["discussion"] or data["citations"] or self._note_existed)
+
 
 class QuestionPool(QWidget):
     # Emitted when the instructor clicks the "Topics…" toolbar button so
@@ -815,6 +866,12 @@ class QuestionPool(QWidget):
                         self.api.upload_image(created["id"], img)
                     except Exception as e:
                         QMessageBox.warning(self, "Image Upload Failed", str(e))
+                if dlg.note_needs_save():
+                    note = dlg.get_note_data()
+                    try:
+                        self.api.upsert_note(created["id"], note["discussion"], note["citations"])
+                    except Exception as e:
+                        QMessageBox.warning(self, "Note Save Failed", str(e))
                 self.refresh()
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Failed to create question: {e}")
@@ -841,6 +898,12 @@ class QuestionPool(QWidget):
                         self.api.delete_image(qid)
                     except Exception as e:
                         QMessageBox.warning(self, "Image Remove Failed", str(e))
+                if dlg.note_needs_save():
+                    note = dlg.get_note_data()
+                    try:
+                        self.api.upsert_note(qid, note["discussion"], note["citations"])
+                    except Exception as e:
+                        QMessageBox.warning(self, "Note Save Failed", str(e))
                 self.refresh()
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Failed to update question: {e}")

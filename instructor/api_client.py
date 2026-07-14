@@ -149,6 +149,19 @@ class ApiClient:
         _raise_for_status(resp)
         return resp.json()
 
+    def upsert_note(self, question_id: int, discussion: str | None, citations: str | None) -> dict[str, Any]:
+        """Create or replace the discussion/citations note for a question.
+
+        Passing None for both fields clears the note's content (the row is
+        kept but its text is emptied), which is how the editor "removes" a note.
+        """
+        resp = self.client.put(
+            f"/api/questions/{question_id}/note",
+            json={"discussion": discussion, "citations": citations},
+        )
+        _raise_for_status(resp)
+        return resp.json()
+
     # ── Quizzes ────────────────────────────────────────────────────────────
 
     def list_quizzes(self) -> list[dict[str, Any]]:
