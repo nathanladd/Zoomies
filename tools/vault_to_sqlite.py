@@ -6,13 +6,12 @@ No external dependencies beyond the Python standard library.
 
 Usage:
     python tools/vault_to_sqlite.py [vault_dir] [--dry-run]
-    python tools/vault_to_sqlite.py [vault_dir] --server http://host:port --user instructor --password rudi
+    python tools/vault_to_sqlite.py [vault_dir] --server http://host:port --user alice --password ...
 
 Defaults (reads connection.json from the project root if present):
     vault_dir   C:\\Users\\natha\\OneDrive\\Documents\\Vault\\Atlas\\Lesson Questions
     server      http://localhost:5000  (from connection.json)
-    user        instructor
-    password    rudi
+    user, password   from connection.json; otherwise pass --user/--password
 
 Expected vault layout:
     Lesson Questions/
@@ -372,10 +371,10 @@ def _load_connection_defaults() -> dict:
         url = f'{scheme}://{host}' if port in (80, 443) else f'{scheme}://{host}:{port}'
         return {
             'server': url,
-            'username': data.get('username', 'instructor'),
-            'password': data.get('password', 'rudi'),
+            'username': data.get('username'),
+            'password': data.get('password'),
         }
-    return {'server': 'http://localhost:5000', 'username': 'instructor', 'password': 'rudi'}
+    return {'server': 'http://localhost:5000', 'username': None, 'password': None}
 
 
 def main() -> None:
@@ -398,12 +397,15 @@ def main() -> None:
     ap.add_argument('--server', default=defaults['server'],
                     help=f'Server base URL (default: {defaults["server"]})')
     ap.add_argument('--user', default=defaults['username'],
-                    help=f'Instructor username (default: {defaults["username"]})')
+                    help='Instructor username (default: from connection.json)')
     ap.add_argument('--password', default=defaults['password'],
-                    help='Instructor password')
+                    help='Instructor password (default: from connection.json)')
     ap.add_argument('--dry-run', action='store_true',
                     help='Parse and preview without writing anything to the server')
     args = ap.parse_args()
+
+    if not args.dry_run and (not args.user or not args.password):
+        ap.error('no credentials found — pass --user/--password or add them to connection.json')
 
     print(f'Vault  : {args.vault_dir}')
     print(f'Server : {args.server}')

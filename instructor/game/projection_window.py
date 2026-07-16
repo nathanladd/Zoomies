@@ -219,6 +219,36 @@ class ProjectionWindow(QWidget):
         self.correct_label.hide()
         self.main_layout.addWidget(self.correct_label)
 
+        # ── Discussion & references reveal ─────────────────────────────────
+        # Shown on the projector at question end (alongside the correct answer
+        # reveal) so the class can see the discussion prompt and sources. The
+        # note content is pushed in by the control panel, which fetches it at
+        # question start. Hidden entirely when the question has no note.
+        self.notes_frame = QFrame()
+        self.notes_frame.setStyleSheet(
+            "background-color: #F5F9FF; border: 1px solid #D0E4F5; border-radius: 12px;"
+        )
+        notes_layout = QVBoxLayout(self.notes_frame)
+        notes_layout.setContentsMargins(28, 18, 28, 18)
+        notes_layout.setSpacing(10)
+
+        self.notes_discussion_label = QLabel("")
+        self.notes_discussion_label.setFont(QFont("Segoe UI", 20))
+        self.notes_discussion_label.setWordWrap(True)
+        self.notes_discussion_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.notes_discussion_label.setStyleSheet("color: #222222; background: transparent;")
+        notes_layout.addWidget(self.notes_discussion_label)
+
+        self.notes_citations_label = QLabel("")
+        self.notes_citations_label.setFont(QFont("Segoe UI", 14))
+        self.notes_citations_label.setWordWrap(True)
+        self.notes_citations_label.setOpenExternalLinks(True)
+        self.notes_citations_label.setStyleSheet("color: #555555; background: transparent;")
+        notes_layout.addWidget(self.notes_citations_label)
+
+        self.notes_frame.hide()
+        self.main_layout.addWidget(self.notes_frame)
+
         # ── Leaderboard area ──────────────────────────────────────────────
         self.lb_title = QLabel("")
         self.lb_title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
@@ -248,6 +278,7 @@ class ProjectionWindow(QWidget):
         self.answers_label.setText("")
         self.image_label.hide()
         self.correct_label.hide()
+        self.hide_notes()
         self.lb_title.hide()
         self.leaderboard_widget.hide()
 
@@ -323,6 +354,7 @@ class ProjectionWindow(QWidget):
         self.question_label.setText("Get Ready!")
         self.question_label.setFont(QFont("Segoe UI", 40, QFont.Weight.Bold))
         self.question_label.setStyleSheet("color: #222222; padding: 20px;")
+        self.hide_notes()
 
     def on_question_start(self, msg: dict):
         self.timer_bar.show()
@@ -330,6 +362,7 @@ class ProjectionWindow(QWidget):
         self.leaderboard_widget.hide()
         self.lb_title.hide()
         self.correct_label.hide()
+        self.hide_notes()
 
         idx = msg.get("index", 0)
         total = msg.get("total", 0)
@@ -424,10 +457,37 @@ class ProjectionWindow(QWidget):
         self.lb_title.show()
         self._show_leaderboard(scores[:8])
 
+    def show_notes(self, note: dict | None) -> None:
+        """Display the question's discussion prompt and references.
+
+        Called by the control panel at question end, right after the correct
+        answer is revealed. ``note`` is the dict returned by the notes API
+        (``discussion`` / ``citations`` keys); ``None`` or an empty note hides
+        the panel so questions without a note leave no empty box on screen.
+        """
+        note = note or {}
+        discussion = (note.get("discussion") or "").strip()
+        citations = (note.get("citations") or "").strip()
+        if discussion:
+            self.notes_discussion_label.setText(discussion)
+            self.notes_discussion_label.show()
+        else:
+            self.notes_discussion_label.hide()
+        if citations:
+            self.notes_citations_label.setText(f"References:  {citations}")
+            self.notes_citations_label.show()
+        else:
+            self.notes_citations_label.hide()
+        self.notes_frame.setVisible(bool(discussion or citations))
+
+    def hide_notes(self) -> None:
+        self.notes_frame.hide()
+
     def on_game_end(self, msg: dict):
         self.timer_bar.hide()
         self.image_label.hide()
         self.correct_label.hide()
+        self.hide_notes()
 
         self.question_label.setText("GAME OVER!")
         self.question_label.setFont(QFont("Segoe UI", 52, QFont.Weight.Bold))

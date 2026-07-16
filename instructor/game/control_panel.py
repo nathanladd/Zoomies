@@ -178,6 +178,10 @@ class GameControlPanel(QWidget):
         self._quiz_question_counts: dict[int, int] = {}
         self._quiz_randomize_defaults: dict[int, bool] = {}
         self._current_image_url: str | None = None
+        # Most recently loaded note for the current question (discussion +
+        # citations). Pushed to the projection window at question end so the
+        # class sees it alongside the correct-answer reveal.
+        self._current_note: dict = {}
         self._build_ui()
         # Marshal background-thread stat results back onto the GUI thread.
         self._stats_loaded.connect(self._on_stats_loaded)
@@ -574,6 +578,7 @@ class GameControlPanel(QWidget):
                 proj.on_answer_count(msg)
             elif msg_type == "question_end":
                 proj.on_question_end(msg)
+                proj.show_notes(self._current_note)
             elif msg_type == "game_end":
                 proj.on_game_end(msg)
 
@@ -755,6 +760,7 @@ class GameControlPanel(QWidget):
             self._qa_stat_labels.append(stat)
         self.qa_stats_summary.setText("")
         # Hide any prior question's note until this one's fetch returns.
+        self._current_note = {}
         self.notes_discussion_label.clear()
         self.notes_citations_label.clear()
         self.notes_group.hide()
@@ -897,6 +903,8 @@ class GameControlPanel(QWidget):
         """
         if self._current_question_id != question_id:
             return
+        # Cache it so question_end can forward it to the projection window.
+        self._current_note = note
         discussion = (note.get("discussion") or "").strip()
         citations = (note.get("citations") or "").strip()
         if discussion:
@@ -927,6 +935,7 @@ class GameControlPanel(QWidget):
         self._current_image_url = None
         self._clear_choice_rows()
         self.qa_stats_summary.setText("")
+        self._current_note = {}
         self.notes_discussion_label.clear()
         self.notes_citations_label.clear()
         self.notes_group.hide()
