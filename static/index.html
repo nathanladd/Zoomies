@@ -68,6 +68,13 @@
         gameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinGame(); });
         gameInput.addEventListener('input', () => { gameInput.value = gameInput.value.toUpperCase(); });
 
+        // Prefill the game code from a QR-scanned URL like /?code=ABC123
+        const codeFromUrl = new URLSearchParams(window.location.search).get('code');
+        if (codeFromUrl) {
+            gameInput.value = codeFromUrl.trim().toUpperCase();
+            nameInput.focus();
+        }
+
         function joinGame() {
             const name = nameInput.value.trim();
             const gameCode = gameInput.value.trim().toUpperCase();

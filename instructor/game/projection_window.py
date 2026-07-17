@@ -193,6 +193,13 @@ class ProjectionWindow(QWidget):
         self.image_label.hide()
         self.main_layout.addWidget(self.image_label)
 
+        # ── Join QR code (waiting screen only) ──────────────────────────────
+        self.qr_label = QLabel()
+        self.qr_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.qr_label.setStyleSheet("padding: 8px;")
+        self.qr_label.hide()
+        self.main_layout.addWidget(self.qr_label)
+
         # ── Footer info row ────────────────────────────────────────────────
         footer = QHBoxLayout()
         self.answers_label = QLabel("")
@@ -282,13 +289,47 @@ class ProjectionWindow(QWidget):
         self.lb_title.hide()
         self.leaderboard_widget.hide()
 
-        self._join_url = f"{self.server_host}:{self.server_port}"
+        self._join_url = (
+            self.server_host
+            if self.server_port in (80, 443)
+            else f"{self.server_host}:{self.server_port}"
+        )
 
         self.question_label.setTextFormat(Qt.TextFormat.RichText)
         self.question_label.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
         self._update_waiting_display()
+        self._update_join_qr()
+
+    def _update_join_qr(self) -> None:
+        """Render a QR code that opens the join page directly on a phone."""
+        scheme = "https" if self.server_port == 443 else "http"
+        path = "" if self.server_port in (80, 443) else f":{self.server_port}"
+        join_target = f"{scheme}://{self.server_host}{path}/"
+        if self.join_code:
+            join_target += f"?code={self.join_code}"
+
+        import io
+        import qrcode
+
+        qr = qrcode.QRCode(border=2, box_size=8)
+        qr.add_data(join_target)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="#0078D4", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+
+        pixmap = QPixmap()
+        pixmap.loadFromData(buf.getvalue(), "PNG")
+        self.qr_label.setPixmap(
+            pixmap.scaled(
+                200, 200,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        )
+        self.qr_label.show()
 
     def _update_waiting_display(self):
         game_text = f"Game Code:&nbsp;&nbsp;<b>{self.join_code}</b>" if self.join_code else ""
@@ -346,6 +387,7 @@ class ProjectionWindow(QWidget):
 
     def on_game_start(self, msg: dict):
         self._is_waiting = False
+        self.qr_label.hide()
         self.question_label.setTextFormat(Qt.TextFormat.PlainText)
         self.question_label.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
