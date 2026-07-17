@@ -14,8 +14,10 @@ let selectedChoice = null;
 let timeSeconds = 10;
 let players = {};
 let reconnectAttempts = 0;
-const MAX_RECONNECT = 5;
 let gameFinished = false;
+let heartbeatInterval = null;
+const HEARTBEAT_MS = 20000;
+let wakeLock = null;
 
 // ── Screens ───────────────────────────────────────────────────────────────────
 
@@ -32,7 +34,28 @@ if (!GAME_ID || !PLAYER_NAME) {
     document.getElementById('player-name-display').textContent = PLAYER_NAME;
     showScreen('screen-waiting');
     connect();
+    requestWakeLock();
 }
+
+// ── Screen wake lock ──────────────────────────────────────────────────────────
+// Keeps the phone's screen from auto-locking from idle timeout during a game.
+// The browser releases the lock whenever the tab is hidden, so we re-request
+// it on visibilitychange rather than trying to hold it across a backgrounding.
+
+async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+        wakeLock = await navigator.wakeLock.request('screen');
+    } catch (err) {
+        console.log('Wake lock request failed:', err);
+    }
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (wakeLock !== null && document.visibilityState === 'visible') {
+        requestWakeLock();
+    }
+});
 
 function connect() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -42,6 +65,11 @@ function connect() {
         reconnectAttempts = 0;
         updateStatus('Connected, joining...');
         ws.send(JSON.stringify({ type: 'player_join', name: PLAYER_NAME }));
+        heartbeatInterval = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping' }));
+            }
+        }, HEARTBEAT_MS);
     };
 
     ws.onmessage = (event) => {
@@ -53,14 +81,20 @@ function connect() {
 
     ws.onclose = (event) => {
         console.log('WebSocket closed', event.code, event.reason);
-        updateStatus('Disconnected: ' + event.code + ' ' + (event.reason || ''));
-        if (!gameFinished && reconnectAttempts < MAX_RECONNECT) {
+        if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
+        }
+        // A reconnect restores the student's name/score cleanly (the server
+        // matches by name), so keep retrying quietly rather than giving up —
+        // phones routinely drop the connection when the screen locks or the
+        // browser is backgrounded between questions.
+        updateStatus('Disconnected: ' + event.code + ' ' + (event.reason || '') + ' — reconnecting...');
+        if (!gameFinished) {
             reconnectAttempts++;
             const delay = Math.min(1000 * reconnectAttempts, 5000);
             console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts})...`);
             setTimeout(connect, delay);
-        } else if (!gameFinished) {
-            showDisconnected();
         }
     };
 
@@ -68,11 +102,6 @@ function connect() {
         console.error('WebSocket error', err);
         updateStatus('Error connecting');
     };
-}
-
-function showDisconnected() {
-    const el = document.getElementById('q-text');
-    if (el) el.textContent = 'Connection lost. Please refresh the page.';
 }
 
 function updateStatus(text) {

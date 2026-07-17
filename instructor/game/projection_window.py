@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QProgressBar, QFrame, QSizePolicy, QSplitter,
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSignal
+from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QColor, QPalette, QKeyEvent, QPixmap, QMouseEvent
 
 from version import __version__
@@ -25,7 +25,7 @@ class ProjectionWindow(QWidget):
         self.server_host = server_host
         self.server_port = server_port
         self.setWindowTitle(f"Zoomies v{__version__} — Projection")
-        self.setMinimumSize(1024, 700)
+        self.setMinimumSize(640, 480)
         self.setStyleSheet("background-color: #FFFFFF; color: #333333;")
 
         self._is_waiting = False
@@ -35,6 +35,9 @@ class ProjectionWindow(QWidget):
         self._drag_pos = None
         self._current_image_url: str | None = None
         self._image_loaded.connect(self._on_image_loaded)
+        self._resize_debounce = QTimer(self)
+        self._resize_debounce.setSingleShot(True)
+        self._resize_debounce.timeout.connect(self._on_resize_settled)
         self._build_ui()
         self._build_fullscreen_hint()
         self._build_version_label()
@@ -78,6 +81,13 @@ class ProjectionWindow(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._place_hint()
+        if self._is_waiting:
+            self._resize_debounce.start(120)
+
+    def _on_resize_settled(self):
+        if self._is_waiting:
+            self._update_waiting_display()
+            self._update_join_qr()
 
     def closeEvent(self, event):
         """Hide instead of destroying.
@@ -184,7 +194,20 @@ class ProjectionWindow(QWidget):
         self.question_label.setWordWrap(True)
         self.question_label.setStyleSheet("color: #222222; padding: 24px;")
         self.question_label.setMinimumHeight(120)
-        self.main_layout.addWidget(self.question_label)
+
+        # ── Join QR code (waiting screen only) ──────────────────────────────
+        # Placed beside the text (not stacked below it) so the waiting screen
+        # stays short enough to fit on lower-resolution projectors.
+        self.qr_label = QLabel()
+        self.qr_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.qr_label.setStyleSheet("padding: 8px;")
+        self.qr_label.hide()
+
+        content_row = QHBoxLayout()
+        content_row.setSpacing(24)
+        content_row.addWidget(self.question_label, 3)
+        content_row.addWidget(self.qr_label, 0)
+        self.main_layout.addLayout(content_row)
 
         # ── Question image ─────────────────────────────────────────────────
         self.image_label = QLabel()
@@ -192,13 +215,6 @@ class ProjectionWindow(QWidget):
         self.image_label.setStyleSheet("padding: 8px;")
         self.image_label.hide()
         self.main_layout.addWidget(self.image_label)
-
-        # ── Join QR code (waiting screen only) ──────────────────────────────
-        self.qr_label = QLabel()
-        self.qr_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.qr_label.setStyleSheet("padding: 8px;")
-        self.qr_label.hide()
-        self.main_layout.addWidget(self.qr_label)
 
         # ── Footer info row ────────────────────────────────────────────────
         footer = QHBoxLayout()
@@ -302,6 +318,12 @@ class ProjectionWindow(QWidget):
         self._update_waiting_display()
         self._update_join_qr()
 
+    def _waiting_scale(self) -> float:
+        """Scale factor for waiting-screen text/QR sizes based on the
+        window's current size, so everything fits regardless of the
+        projector's actual resolution instead of overflowing a fixed layout."""
+        return max(0.5, min(1.6, min(self.width() / 1024, self.height() / 700)))
+
     def _update_join_qr(self) -> None:
         """Render a QR code that opens the join page directly on a phone."""
         scheme = "https" if self.server_port == 443 else "http"
@@ -320,11 +342,12 @@ class ProjectionWindow(QWidget):
         buf = io.BytesIO()
         img.save(buf, format="PNG")
 
+        qr_px = max(120, round(200 * self._waiting_scale()))
         pixmap = QPixmap()
         pixmap.loadFromData(buf.getvalue(), "PNG")
         self.qr_label.setPixmap(
             pixmap.scaled(
-                200, 200,
+                qr_px, qr_px,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
@@ -332,6 +355,15 @@ class ProjectionWindow(QWidget):
         self.qr_label.show()
 
     def _update_waiting_display(self):
+        scale = self._waiting_scale()
+        title_px = round(64 * scale)
+        subtitle_px = round(15 * scale)
+        label_px = round(20 * scale)
+        url_px = round(40 * scale)
+        code_px = round(32 * scale)
+        players_px = round(22 * scale)
+        names_px = round(20 * scale)
+
         game_text = f"Game Code:&nbsp;&nbsp;<b>{self.join_code}</b>" if self.join_code else ""
         if self._player_count > 0:
             players_text = f'{self._player_count} player{"s" if self._player_count != 1 else ""} joined'
@@ -344,17 +376,17 @@ class ProjectionWindow(QWidget):
                 f'<span style="color:#333333;">{n}</span>' for n in self._player_names
             )
             names_html = (
-                f'<div style="font-size:20px; color:#555555; margin-top:16px; '
+                f'<div style="font-size:{names_px}px; color:#555555; margin-top:16px; '
                 f'line-height:1.6;">{name_spans}</div>'
             )
         self.question_label.setText(
             f'<div style="text-align:center;">'
-            f'<div style="font-size:64px; font-weight:bold; color:#0078D4; margin-bottom:12px; letter-spacing:2px;">Zoomies</div>'
-            f'<div style="font-size:15px; color:#777777; margin-bottom:24px;">A classroom quiz game.</div>'
-            f'<div style="font-size:20px; color:#555555; margin-bottom:4px;">Join at</div>'
-            f'<div style="font-size:40px; font-weight:bold; color:#0078D4; margin-bottom:16px;">{self._join_url}</div>'
-            f'<div style="font-size:32px; font-weight:bold; color:#2E7D32; margin-bottom:16px;">{game_text}</div>'
-            f'<div style="font-size:22px; color:#555555;">{players_text}</div>'
+            f'<div style="font-size:{title_px}px; font-weight:bold; color:#0078D4; margin-bottom:12px; letter-spacing:2px;">Zoomies</div>'
+            f'<div style="font-size:{subtitle_px}px; color:#777777; margin-bottom:24px;">A classroom quiz game.</div>'
+            f'<div style="font-size:{label_px}px; color:#555555; margin-bottom:4px;">Join at</div>'
+            f'<div style="font-size:{url_px}px; font-weight:bold; color:#0078D4; margin-bottom:16px;">{self._join_url}</div>'
+            f'<div style="font-size:{code_px}px; font-weight:bold; color:#2E7D32; margin-bottom:16px;">{game_text}</div>'
+            f'<div style="font-size:{players_px}px; color:#555555;">{players_text}</div>'
             f'{names_html}'
             f'</div>'
         )

@@ -217,6 +217,9 @@ async def handle_student_ws(ws: WebSocket, game_id: int) -> None:
             msg = json.loads(raw)
             msg_type = msg.get("type")
 
+            if msg_type == "ping":
+                continue
+
             if msg_type == "submit_answer":
                 choice = msg.get("choice", "")
                 elapsed_ms = msg.get("elapsed_ms", 0)
