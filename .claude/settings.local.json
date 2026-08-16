@@ -10,7 +10,8 @@
       "Bash(grep -E \"\\\\.\\(md|json|py\\)$\")",
       "Bash(xargs grep -l \"manager\\\\|ConnectionManager\")",
       "Bash(Get-ChildItem -Path \"c:\\\\GitHub\\\\Rudi\" -Recurse -Directory)",
-      "Bash(Select-Object -ExpandProperty FullName)"
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(curl -sL -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36\" \"https://pixabay.com/music/synthwave-the-80s-retrowave-synthwave-143303/\" -o /tmp/pixabay_page.html)"
     ],
     "additionalDirectories": [
       "C:\\Users\\natha\\OneDrive\\Documents\\Obsidian Valt\\Effort\\Rudi"

@@ -25,10 +25,18 @@ from version_info import write_version_file  # noqa: E402
 VERSION_FILE = write_version_file(PROJECT_ROOT, PROJECT_ROOT / "build" / "file_version_info.txt")
 
 # ---- Data files bundled inside the exe -----------------------------------
-# The instructor app only needs version.py. Static files and media are
-# served by the remote server; students connect directly to it.
+# The instructor app only needs version.py, plus the projector sound
+# effects it plays locally (everything else — static files, question
+# media — is served by the remote server; students connect directly to it).
+_SOUND_FILES = [
+    "new_player.ogg", "correct.mp3", "wrong-buzzer.mp3",
+    "time_1.mp3", "time_2.mp3", "time_3.mp3", "time_4.mp3", "time_5.mp3",
+]
 datas = [
     (str(PROJECT_ROOT / "version.py"), "."),
+] + [
+    (str(PROJECT_ROOT / "media" / "sounds" / f), "media/sounds")
+    for f in _SOUND_FILES
 ]
 
 # ---- Hidden imports ------------------------------------------------------

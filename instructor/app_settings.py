@@ -10,6 +10,8 @@ from pathlib import Path
 
 _DEFAULTS: dict = {
     "auto_check_updates": True,
+    "sound_volume": 0.7,
+    "sound_muted": False,
 }
 
 
@@ -31,6 +33,10 @@ def load() -> dict:
                 data = json.load(f)
             if isinstance(data.get("auto_check_updates"), bool):
                 settings["auto_check_updates"] = data["auto_check_updates"]
+            if isinstance(data.get("sound_volume"), (int, float)):
+                settings["sound_volume"] = max(0.0, min(1.0, float(data["sound_volume"])))
+            if isinstance(data.get("sound_muted"), bool):
+                settings["sound_muted"] = data["sound_muted"]
         except Exception:
             pass
     return settings

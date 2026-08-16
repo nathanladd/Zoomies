@@ -5,13 +5,14 @@ from collections import deque
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QMessageBox, QComboBox, QGroupBox, QTableWidget, QTableWidgetItem,
-    QHeaderView, QPlainTextEdit, QSpinBox, QCheckBox,
+    QHeaderView, QPlainTextEdit, QSpinBox, QCheckBox, QSlider,
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread
 from PyQt6.QtGui import QKeySequence, QPixmap, QShortcut
 
 from instructor.api_client import ApiClient
 from instructor.game.projection_window import ProjectionWindow
+from instructor.game.sound_manager import SoundManager
 
 
 try:
@@ -168,6 +169,11 @@ class GameControlPanel(QWidget):
         self.server_port = server_port
         self.ws_thread: WebSocketThread | None = None
         self.projection_window: ProjectionWindow | None = None
+        self.sound = SoundManager()
+        # True from game_start until game_end/new game — gates the
+        # player-joined chime to the lobby only, so mid-game reconnects
+        # (phones dropping and rejoining) don't retrigger it.
+        self._game_in_progress = False
         self.current_game_id: int | None = None
         self.current_join_code: str | None = None
         self._players: dict[int, str] = {}  # player_id -> name
@@ -293,6 +299,25 @@ class GameControlPanel(QWidget):
         btn_row.addWidget(self.btn_reveal)
         btn_row.addWidget(self.btn_end)
         controls_layout.addLayout(btn_row)
+
+        # Sound row
+        sound_row = QHBoxLayout()
+        self.btn_mute = QPushButton("Mute")
+        self.btn_mute.setCheckable(True)
+        self.btn_mute.setChecked(self.sound.muted)
+        self.btn_mute.setFixedWidth(70)
+        self.btn_mute.clicked.connect(self._on_mute_toggled)
+        self.volume_slider = QSlider(Qt.Orientation.Horizontal)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(round(self.sound.volume * 100))
+        self.volume_slider.setFixedWidth(120)
+        self.volume_slider.setEnabled(not self.sound.muted)
+        self.volume_slider.valueChanged.connect(self._on_volume_changed)
+        sound_row.addWidget(QLabel("Sound:"))
+        sound_row.addWidget(self.btn_mute)
+        sound_row.addWidget(self.volume_slider)
+        sound_row.addStretch()
+        controls_layout.addLayout(sound_row)
 
         # Info row
         info_row = QHBoxLayout()
@@ -485,6 +510,8 @@ class GameControlPanel(QWidget):
 
     def _stop_current_game(self) -> None:
         """Cleanly terminate whatever game is currently running (if any)."""
+        self.sound.stop_question_tension()
+        self._game_in_progress = False
         # Disconnect the existing WS thread first so its disconnected signal
         # doesn't race with the new game's connected signal.
         if self.ws_thread is not None:
@@ -583,6 +610,8 @@ class GameControlPanel(QWidget):
                 proj.on_game_end(msg)
 
         if msg_type == "player_joined":
+            if not self._game_in_progress:
+                self.sound.play_player_joined()
             self.players_label.setText(f"Players: {msg.get('player_count', 0)}")
             pid = msg.get("player_id")
             name = msg.get("name", "")
@@ -597,6 +626,7 @@ class GameControlPanel(QWidget):
             self._update_leaderboard_from_players()
 
         elif msg_type == "game_start":
+            self._game_in_progress = True
             self.status_label.setText("Status: Game started!")
             if self.current_game_id is not None:
                 code_display = self.current_join_code or str(self.current_game_id)
@@ -605,6 +635,7 @@ class GameControlPanel(QWidget):
             self.btn_next.setEnabled(True)
 
         elif msg_type == "question_start":
+            self.sound.start_question_tension()
             idx = msg.get("index", 0)
             total = msg.get("total", 0)
             self.q_label.setText(f"Question: {idx + 1} / {total}")
@@ -636,13 +667,16 @@ class GameControlPanel(QWidget):
         elif msg_type == "player_answered":
             pid = msg.get("player_id")
             if pid is not None:
-                self._answer_status[pid] = bool(msg.get("is_correct", False))
+                is_correct = bool(msg.get("is_correct", False))
+                self._answer_status[pid] = is_correct
                 self._refresh_answer_column()
+                self.sound.play_answer(is_correct)
 
         elif msg_type == "answer_count":
             self.answers_label.setText(f"Answers: {msg.get('answered', 0)}/{msg.get('total', 0)}")
 
         elif msg_type == "question_end":
+            self.sound.stop_question_tension()
             self.btn_reveal.setEnabled(False)
             self.btn_next.setEnabled(True)
             self.time_label.setText("Time: -")
@@ -651,6 +685,8 @@ class GameControlPanel(QWidget):
             self._fetch_question_stats_async(self._current_question_id)
 
         elif msg_type == "game_end":
+            self.sound.stop_question_tension()
+            self._game_in_progress = False
             self.status_label.setText("Status: Game finished!")
             self.game_label.setText("No active game")
             self.current_game_id = None
@@ -663,6 +699,15 @@ class GameControlPanel(QWidget):
             self._answer_status.clear()
             self._refresh_answer_column()
             self._clear_question()
+
+    # ── Sound controls ──────────────────────────────────────────────────
+
+    def _on_mute_toggled(self, checked: bool) -> None:
+        self.sound.set_muted(checked)
+        self.volume_slider.setEnabled(not checked)
+
+    def _on_volume_changed(self, value: int) -> None:
+        self.sound.set_volume(value / 100)
 
     def _start_game(self):
         if self.ws_thread:
