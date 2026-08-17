@@ -260,6 +260,10 @@ function submitAnswer(choice) {
     btns.forEach(btn => {
         if (btn.dataset.choice === choice) {
             btn.classList.add('selected');
+            const badge = document.createElement('span');
+            badge.className = 'choice-badge badge-locked';
+            badge.textContent = '✓';
+            btn.appendChild(badge);
         }
         btn.classList.add('locked');
     });
@@ -314,16 +318,22 @@ function showQuestionResult(msg) {
         const div = document.createElement('div');
         div.textContent = choice;
 
+        let badge = null;
         if (choice === msg.correct_choice) {
             div.className = 'result-choice result-correct';
-            if (choice === selectedChoice) {
-                div.textContent += ' ✓';
-            }
+            badge = { cls: 'badge-correct', icon: '✓' };
         } else if (choice === selectedChoice) {
             div.className = 'result-choice result-wrong-selected';
-            div.textContent += ' ✗';
+            badge = { cls: 'badge-incorrect', icon: '✗' };
         } else {
             div.className = 'result-choice result-neutral';
+        }
+
+        if (badge) {
+            const badgeEl = document.createElement('span');
+            badgeEl.className = `choice-badge ${badge.cls}`;
+            badgeEl.textContent = badge.icon;
+            div.appendChild(badgeEl);
         }
         choicesDiv.appendChild(div);
     });
