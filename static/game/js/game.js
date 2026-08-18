@@ -18,6 +18,8 @@ let gameFinished = false;
 let heartbeatInterval = null;
 const HEARTBEAT_MS = 20000;
 let wakeLock = null;
+let noSleepVideo = null;
+let noSleepDrawTimer = null;
 
 // ── Screens ───────────────────────────────────────────────────────────────────
 
@@ -41,21 +43,66 @@ if (!GAME_ID || !PLAYER_NAME) {
 // Keeps the phone's screen from auto-locking from idle timeout during a game.
 // The browser releases the lock whenever the tab is hidden, so we re-request
 // it on visibilitychange rather than trying to hold it across a backgrounding.
+//
+// navigator.wakeLock only works in a secure context (HTTPS or localhost), but
+// players join over plain http:// on the local network, so the real API is
+// unavailable in practice. We fall back to a hidden, silent looping "video"
+// (a canvas MediaStream) — mobile browsers treat active video playback as
+// activity and won't auto-lock the screen while it's running.
 
 async function requestWakeLock() {
-    if (!('wakeLock' in navigator)) return;
-    try {
-        wakeLock = await navigator.wakeLock.request('screen');
-    } catch (err) {
-        console.log('Wake lock request failed:', err);
+    if ('wakeLock' in navigator) {
+        try {
+            wakeLock = await navigator.wakeLock.request('screen');
+            return;
+        } catch (err) {
+            console.log('Wake lock request failed:', err);
+        }
     }
+    startNoSleepVideo();
 }
 
 document.addEventListener('visibilitychange', () => {
-    if (wakeLock !== null && document.visibilityState === 'visible') {
+    if (document.visibilityState !== 'visible') return;
+    if (wakeLock !== null) {
         requestWakeLock();
+    } else if (noSleepVideo) {
+        noSleepVideo.play().catch(() => {});
     }
 });
+
+function startNoSleepVideo() {
+    if (noSleepVideo) return;
+    const canvas = document.createElement('canvas');
+    if (!canvas.captureStream) return;
+    try {
+        canvas.width = 2;
+        canvas.height = 2;
+        const ctx = canvas.getContext('2d');
+        let toggle = false;
+        const draw = () => {
+            toggle = !toggle;
+            ctx.fillStyle = toggle ? '#000000' : '#010101';
+            ctx.fillRect(0, 0, 2, 2);
+        };
+        draw();
+        const stream = canvas.captureStream(2);
+        noSleepDrawTimer = setInterval(draw, 500);
+
+        const video = document.createElement('video');
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        video.setAttribute('muted', '');
+        video.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;';
+        video.srcObject = stream;
+        document.body.appendChild(video);
+        video.play().catch(err => console.log('No-sleep video play failed:', err));
+        noSleepVideo = video;
+    } catch (err) {
+        console.log('No-sleep fallback failed:', err);
+    }
+}
 
 function connect() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
