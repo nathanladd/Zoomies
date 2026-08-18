@@ -104,10 +104,6 @@ body {
     animation: badgePop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.badge-locked {
-    background: #0078d4;
-}
-
 .badge-correct {
     background: #2E7D32;
 }

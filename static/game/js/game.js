@@ -260,10 +260,6 @@ function submitAnswer(choice) {
     btns.forEach(btn => {
         if (btn.dataset.choice === choice) {
             btn.classList.add('selected');
-            const badge = document.createElement('span');
-            badge.className = 'choice-badge badge-locked';
-            badge.textContent = '✓';
-            btn.appendChild(badge);
         }
         btn.classList.add('locked');
     });
